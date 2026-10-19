@@ -87,8 +87,8 @@ class Oli_CJ_Site_Health {
 		);
 
 		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
-			$result['status'] = 'recommended';
-			$result['label'] = __( 'WP-Cron is disabled', 'oli-cron-jobs' );
+			$result['status']      = 'recommended';
+			$result['label']       = __( 'WP-Cron is disabled', 'oli-cron-jobs' );
 			$result['description'] = sprintf(
 				'<p>%s</p>',
 				__( 'WP-Cron is disabled via the DISABLE_WP_CRON constant. Make sure you have set up a server cron job to trigger wp-cron.php regularly.', 'oli-cron-jobs' )
@@ -118,7 +118,7 @@ class Oli_CJ_Site_Health {
 			'test'        => 'oli_cj_cron_spawn',
 		);
 
-		$cron_url = site_url( 'wp-cron.php' );
+		$cron_url      = site_url( 'wp-cron.php' );
 		$doing_wp_cron = sprintf( '%.22F', microtime( true ) );
 
 		$cron_request = apply_filters(
@@ -139,8 +139,8 @@ class Oli_CJ_Site_Health {
 		$response = wp_remote_post( $cron_request['url'], $cron_request['args'] );
 
 		if ( is_wp_error( $response ) ) {
-			$result['status'] = 'critical';
-			$result['label'] = __( 'WP-Cron cannot spawn', 'oli-cron-jobs' );
+			$result['status']      = 'critical';
+			$result['label']       = __( 'WP-Cron cannot spawn', 'oli-cron-jobs' );
 			$result['description'] = sprintf(
 				'<p>%s</p><p>%s</p>',
 				__( 'WordPress is unable to spawn cron processes. This may prevent scheduled tasks from running.', 'oli-cron-jobs' ),
@@ -151,8 +151,8 @@ class Oli_CJ_Site_Health {
 				)
 			);
 		} elseif ( wp_remote_retrieve_response_code( $response ) >= 400 ) {
-			$result['status'] = 'recommended';
-			$result['label'] = __( 'WP-Cron spawn returned an error', 'oli-cron-jobs' );
+			$result['status']      = 'recommended';
+			$result['label']       = __( 'WP-Cron spawn returned an error', 'oli-cron-jobs' );
 			$result['description'] = sprintf(
 				'<p>%s</p>',
 				sprintf(
@@ -189,9 +189,9 @@ class Oli_CJ_Site_Health {
 		$missed = $this->get_missed_events();
 
 		if ( ! empty( $missed ) ) {
-			$count = count( $missed );
+			$count            = count( $missed );
 			$result['status'] = 'recommended';
-			$result['label'] = sprintf(
+			$result['label']  = sprintf(
 				/* translators: %d: number of missed events */
 				_n( '%d missed cron event', '%d missed cron events', $count, 'oli-cron-jobs' ),
 				$count
@@ -220,8 +220,8 @@ class Oli_CJ_Site_Health {
 	 * @return array
 	 */
 	private function get_missed_events() {
-		$crons = _get_cron_array();
-		$missed = array();
+		$crons        = _get_cron_array();
+		$missed       = array();
 		$current_time = time();
 
 		if ( empty( $crons ) ) {
@@ -229,7 +229,7 @@ class Oli_CJ_Site_Health {
 		}
 
 		foreach ( $crons as $timestamp => $cron ) {
-			// Event is missed if it's more than 10 minutes in the past
+			// Event is missed if it's more than 10 minutes in the past.
 			if ( $timestamp < ( $current_time - 600 ) ) {
 				foreach ( $cron as $hook => $dings ) {
 					foreach ( $dings as $sig => $data ) {
@@ -253,7 +253,7 @@ class Oli_CJ_Site_Health {
 	 * @return array
 	 */
 	public function add_debug_info( $debug_info ) {
-		$crons = _get_cron_array();
+		$crons        = _get_cron_array();
 		$total_events = 0;
 
 		if ( ! empty( $crons ) ) {
@@ -264,37 +264,37 @@ class Oli_CJ_Site_Health {
 			}
 		}
 
-		$schedules = wp_get_schedules();
+		$schedules        = wp_get_schedules();
 		$custom_schedules = Oli_CJ_Schedule_Manager::get_custom_schedules();
 
 		$debug_info['oli-cron-jobs'] = array(
 			'label'  => __( 'Oli Cron Jobs', 'oli-cron-jobs' ),
 			'fields' => array(
-				'plugin_version'    => array(
+				'plugin_version'   => array(
 					'label' => __( 'Plugin Version', 'oli-cron-jobs' ),
 					'value' => OLI_CJ_VERSION,
 				),
-				'total_events'      => array(
+				'total_events'     => array(
 					'label' => __( 'Total Cron Events', 'oli-cron-jobs' ),
 					'value' => $total_events,
 				),
-				'total_schedules'   => array(
+				'total_schedules'  => array(
 					'label' => __( 'Total Schedules', 'oli-cron-jobs' ),
 					'value' => count( $schedules ),
 				),
-				'custom_schedules'  => array(
+				'custom_schedules' => array(
 					'label' => __( 'Custom Schedules', 'oli-cron-jobs' ),
 					'value' => count( $custom_schedules ),
 				),
-				'cron_disabled'     => array(
+				'cron_disabled'    => array(
 					'label' => __( 'WP-Cron Disabled', 'oli-cron-jobs' ),
 					'value' => ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) ? __( 'Yes', 'oli-cron-jobs' ) : __( 'No', 'oli-cron-jobs' ),
 				),
-				'log_retention'     => array(
+				'log_retention'    => array(
 					'label' => __( 'Log Retention (days)', 'oli-cron-jobs' ),
 					'value' => get_option( 'oli_cj_log_retention_days', 30 ),
 				),
-				'total_logs'        => array(
+				'total_logs'       => array(
 					'label' => __( 'Total Log Entries', 'oli-cron-jobs' ),
 					'value' => Oli_CJ_Logger::get_log_count(),
 				),
@@ -312,7 +312,7 @@ class Oli_CJ_Site_Health {
 	public static function get_issues() {
 		$issues = array();
 
-		// Check if WP-Cron is disabled
+		// Check if WP-Cron is disabled.
 		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
 			$issues[] = array(
 				'type'    => 'warning',
@@ -320,11 +320,11 @@ class Oli_CJ_Site_Health {
 			);
 		}
 
-		// Check for missed events
+		// Check for missed events.
 		$instance = self::get_instance();
-		$missed = $instance->get_missed_events();
+		$missed   = $instance->get_missed_events();
 		if ( ! empty( $missed ) ) {
-			$count = count( $missed );
+			$count    = count( $missed );
 			$issues[] = array(
 				'type'    => 'error',
 				'message' => sprintf(

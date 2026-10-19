@@ -50,7 +50,7 @@ class Oli_CJ_CLI {
 			return;
 		}
 
-		// Filter by hook if specified
+		// Filter by hook if specified.
 		if ( ! empty( $assoc_args['hook'] ) ) {
 			$events = array_filter(
 				$events,
@@ -63,10 +63,10 @@ class Oli_CJ_CLI {
 		$items = array();
 		foreach ( $events as $event ) {
 			$items[] = array(
-				'hook'      => $event['hook'],
-				'next_run'  => gmdate( 'Y-m-d H:i:s', $event['timestamp'] ),
+				'hook'       => $event['hook'],
+				'next_run'   => gmdate( 'Y-m-d H:i:s', $event['timestamp'] ),
 				'recurrence' => $event['schedule'] ? $event['schedule'] : __( 'Non-repeating', 'oli-cron-jobs' ),
-				'status'    => $event['timestamp'] < time() ? __( 'Overdue', 'oli-cron-jobs' ) : __( 'Scheduled', 'oli-cron-jobs' ),
+				'status'     => $event['timestamp'] < time() ? __( 'Overdue', 'oli-cron-jobs' ) : __( 'Scheduled', 'oli-cron-jobs' ),
 			);
 		}
 

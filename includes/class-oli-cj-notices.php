@@ -72,12 +72,12 @@ class Oli_CJ_Notices {
 			return;
 		}
 
-		$issues = Oli_CJ_Site_Health::get_issues();
+		$issues     = Oli_CJ_Site_Health::get_issues();
 		$has_issues = ! empty( $issues );
 
 		$title = __( 'Cron Jobs', 'oli-cron-jobs' );
 		if ( $has_issues ) {
-			$count = count( $issues );
+			$count  = count( $issues );
 			$title .= sprintf( ' <span class="ab-label awaiting-mod count-%d">%d</span>', $count, $count );
 		}
 
@@ -89,7 +89,7 @@ class Oli_CJ_Notices {
 			)
 		);
 
-		// Add submenu items
+		// Add submenu items.
 		$wp_admin_bar->add_node(
 			array(
 				'parent' => 'oli-cron-jobs',

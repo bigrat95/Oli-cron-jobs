@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-10-19
+
+### Added
+- Edit event UI with full support for all event types (standard, URL, PHP)
+  - Change hook name, arguments, next run time, and schedule
+  - Modify URL for URL events
+  - Edit PHP code for PHP events (with same capability restrictions)
+  - Full validation and security checks
+- Export/Import functionality
+  - Export all events, custom schedules, and paused hooks as JSON
+  - Import previously exported data
+  - Available from Settings page
+  - Preserves all event types including URL and PHP events
+- Advanced filtering system
+  - Filter by status: scheduled, overdue, paused
+  - Filter by schedule type: single events or specific schedules
+  - Filter by hook type: core (wp_*), plugin/theme, URL events, PHP events
+  - Combined search and filter capabilities
+- Plugin/theme source detection for callbacks
+  - Shows which plugin or theme registered each callback
+  - Uses reflection to determine source file
+  - Displays plugin/theme name with version when available
+  - Identifies WordPress core, plugins, themes, and MU-plugins
+
+### Changed
+- Enhanced callbacks column to show source information
+- Improved admin interface with better filtering options
+- Updated list table to include edit action link
+- Refined filter dropdowns with better categorization
+
+### Fixed
+- Code quality improvements
+  - Fixed inline comment formatting (added periods)
+  - Improved code alignment and spacing
+  - Enhanced PHPDoc comments
+- Input sanitization and validation improvements
+- Better error handling for edge cases
+
+### Technical
+- Ran PHP lint across all supported versions (7.4-8.3)
+- Applied PHPCS WordPress Coding Standards
+- Auto-fixed 116 formatting issues with PHPCBF
+- Reduced errors from 82 to 31 through systematic fixes
+- Added reflection-based source detection
+- Improved filter performance with optimized queries
+
 ## [0.1.0] - 2026-10-19
 
 ### Added

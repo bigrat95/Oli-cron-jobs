@@ -156,5 +156,5 @@ class Oli_CJ_Schedule_Manager {
 	}
 }
 
-// Initialize schedule manager
+// Initialize schedule manager.
 Oli_CJ_Schedule_Manager::init();

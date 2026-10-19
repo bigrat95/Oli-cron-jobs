@@ -5,7 +5,7 @@ Tags: cron, wp-cron, scheduled tasks, cron manager, debugging
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -107,6 +107,16 @@ By default, logs are kept for 30 days. You can configure this in the settings pa
 5. Admin bar quick access
 
 == Changelog ==
+
+= 0.1.1 =
+* Added: Edit event UI with support for all event types
+* Added: Export/Import functionality for events and schedules (JSON format)
+* Added: Advanced filtering by status, schedule type, and hook type
+* Added: Plugin/theme source detection for callbacks using reflection
+* Enhanced: Callbacks column now shows which plugin/theme registered each callback
+* Improved: Code quality with PHPCS WordPress Coding Standards compliance
+* Fixed: Inline comment formatting and code alignment
+* Fixed: Input sanitization and validation improvements
 
 = 0.1.0 =
 * Initial release

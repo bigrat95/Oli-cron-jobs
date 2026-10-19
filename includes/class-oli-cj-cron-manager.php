@@ -18,7 +18,7 @@ class Oli_CJ_Cron_Manager {
 	 * Initialize hooks
 	 */
 	public static function init() {
-		// Hook into all actions to execute URL and PHP events
+		// Hook into all actions to execute URL and PHP events.
 		add_action( 'init', array( __CLASS__, 'register_event_handlers' ), 1 );
 	}
 
@@ -26,13 +26,13 @@ class Oli_CJ_Cron_Manager {
 	 * Register handlers for URL and PHP events
 	 */
 	public static function register_event_handlers() {
-		// Get all URL events
+		// Get all URL events.
 		$url_events = get_option( 'oli_cj_url_events', array() );
 		foreach ( $url_events as $hook => $url ) {
 			add_action( $hook, array( __CLASS__, 'execute_url_event_wrapper' ) );
 		}
 
-		// Get all PHP events (only if user has proper capabilities)
+		// Get all PHP events (only if user has proper capabilities).
 		if ( self::can_execute_php_events() ) {
 			$php_events = get_option( 'oli_cj_php_events', array() );
 			foreach ( $php_events as $hook => $code ) {
@@ -63,12 +63,12 @@ class Oli_CJ_Cron_Manager {
 	 * @return bool
 	 */
 	public static function can_execute_php_events() {
-		// Disabled if file editing is disabled
+		// Disabled if file editing is disabled.
 		if ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT ) {
 			return false;
 		}
 
-		// Require both edit_files and unfiltered_html capabilities
+		// Require both edit_files and unfiltered_html capabilities.
 		return current_user_can( 'edit_files' ) && current_user_can( 'unfiltered_html' );
 	}
 
@@ -118,10 +118,10 @@ class Oli_CJ_Cron_Manager {
 			return false;
 		}
 
-		$event = $crons[ $timestamp ][ $hook ][ $sig ];
-		$event['hook'] = $hook;
+		$event              = $crons[ $timestamp ][ $hook ][ $sig ];
+		$event['hook']      = $hook;
 		$event['timestamp'] = $timestamp;
-		$event['sig'] = $sig;
+		$event['sig']       = $sig;
 
 		return $event;
 	}
@@ -182,7 +182,7 @@ class Oli_CJ_Cron_Manager {
 			if ( isset( $cron[ $hook ] ) ) {
 				foreach ( $cron[ $hook ] as $sig => $data ) {
 					wp_unschedule_event( $timestamp, $hook, $data['args'] );
-					$count++;
+					++$count;
 				}
 			}
 		}
@@ -200,12 +200,12 @@ class Oli_CJ_Cron_Manager {
 	public static function run_event_now( $hook, $args = array() ) {
 		$start_time = microtime( true );
 
-		// Run the event
+		// Run the event.
 		do_action_ref_array( $hook, $args );
 
 		$duration = microtime( true ) - $start_time;
 
-		// Log the execution
+		// Log the execution.
 		Oli_CJ_Logger::log_event( $hook, $args, 'manual', $duration );
 
 		return true;
@@ -224,10 +224,10 @@ class Oli_CJ_Cron_Manager {
 	 * @return bool
 	 */
 	public static function edit_event( $old_hook, $old_timestamp, $old_sig, $new_hook, $new_timestamp, $new_args, $new_schedule ) {
-		// Delete old event
+		// Delete old event.
 		self::delete_event( $old_hook, $old_timestamp, $old_sig );
 
-		// Add new event
+		// Add new event.
 		return self::add_event( $new_hook, $new_timestamp, $new_args, $new_schedule );
 	}
 
@@ -253,7 +253,7 @@ class Oli_CJ_Cron_Manager {
 					'accepted_args' => $function['accepted_args'],
 					'source'        => self::get_callback_source( $function['function'] ),
 				);
-				$callbacks[] = $callback_info;
+				$callbacks[]   = $callback_info;
 			}
 		}
 
@@ -289,7 +289,7 @@ class Oli_CJ_Cron_Manager {
 				}
 			}
 		} catch ( Exception $e ) {
-			// Reflection failed, return unknown
+			// Reflection failed, return unknown.
 		}
 
 		return __( 'Unknown', 'oli-cron-jobs' );
@@ -302,17 +302,17 @@ class Oli_CJ_Cron_Manager {
 	 * @return string
 	 */
 	private static function determine_file_source( $file ) {
-		// WordPress core
+		// WordPress core.
 		if ( strpos( $file, ABSPATH . WPINC ) === 0 || strpos( $file, ABSPATH . 'wp-admin' ) === 0 ) {
 			return __( 'WordPress Core', 'oli-cron-jobs' );
 		}
 
-		// Plugin
+		// Plugin.
 		if ( strpos( $file, WP_PLUGIN_DIR ) === 0 ) {
 			$relative_path = str_replace( WP_PLUGIN_DIR . '/', '', $file );
-			$plugin_slug = explode( '/', $relative_path )[0];
-			
-			// Get plugin name if available
+			$plugin_slug   = explode( '/', $relative_path )[0];
+
+			// Get plugin name if available.
 			if ( ! function_exists( 'get_plugins' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/plugin.php';
 			}
@@ -326,7 +326,7 @@ class Oli_CJ_Cron_Manager {
 					);
 				}
 			}
-			
+
 			return sprintf(
 				/* translators: %s: plugin slug */
 				__( 'Plugin: %s', 'oli-cron-jobs' ),
@@ -334,11 +334,11 @@ class Oli_CJ_Cron_Manager {
 			);
 		}
 
-		// Theme
+		// Theme.
 		if ( strpos( $file, get_theme_root() ) === 0 ) {
 			$relative_path = str_replace( get_theme_root() . '/', '', $file );
-			$theme_slug = explode( '/', $relative_path )[0];
-			
+			$theme_slug    = explode( '/', $relative_path )[0];
+
 			$theme = wp_get_theme( $theme_slug );
 			if ( $theme->exists() ) {
 				return sprintf(
@@ -347,7 +347,7 @@ class Oli_CJ_Cron_Manager {
 					$theme->get( 'Name' )
 				);
 			}
-			
+
 			return sprintf(
 				/* translators: %s: theme slug */
 				__( 'Theme: %s', 'oli-cron-jobs' ),
@@ -355,9 +355,9 @@ class Oli_CJ_Cron_Manager {
 			);
 		}
 
-		// MU Plugin
+		// MU Plugin.
 		if ( defined( 'WPMU_PLUGIN_DIR' ) && strpos( $file, WPMU_PLUGIN_DIR ) === 0 ) {
-			$relative_path = str_replace( WPMU_PLUGIN_DIR . '/', '', $file );
+			$relative_path  = str_replace( WPMU_PLUGIN_DIR . '/', '', $file );
 			$mu_plugin_file = explode( '/', $relative_path )[0];
 			return sprintf(
 				/* translators: %s: mu-plugin file name */
@@ -429,7 +429,7 @@ class Oli_CJ_Cron_Manager {
 	 */
 	public static function resume_hook( $hook ) {
 		$paused_hooks = get_option( 'oli_cj_paused_hooks', array() );
-		$key = array_search( $hook, $paused_hooks, true );
+		$key          = array_search( $hook, $paused_hooks, true );
 		if ( false !== $key ) {
 			unset( $paused_hooks[ $key ] );
 			return update_option( 'oli_cj_paused_hooks', array_values( $paused_hooks ) );
@@ -442,10 +442,10 @@ class Oli_CJ_Cron_Manager {
 	 */
 	public static function maybe_block_paused_hook( $hook ) {
 		if ( self::is_hook_paused( $hook ) ) {
-			// Remove all actions for this hook temporarily
+			// Remove all actions for this hook temporarily.
 			remove_all_actions( $hook );
 
-			// Log that it was blocked
+			// Log that it was blocked.
 			Oli_CJ_Logger::log_event( $hook, array(), 'blocked', 0, 'Hook is paused' );
 		}
 	}
@@ -461,12 +461,12 @@ class Oli_CJ_Cron_Manager {
 	 * @return bool
 	 */
 	public static function add_php_event( $hook, $timestamp, $php_code, $args = array(), $schedule = false ) {
-		// Store PHP code in option
-		$php_events = get_option( 'oli_cj_php_events', array() );
+		// Store PHP code in option.
+		$php_events          = get_option( 'oli_cj_php_events', array() );
 		$php_events[ $hook ] = $php_code;
 		update_option( 'oli_cj_php_events', $php_events );
 
-		// Schedule the event
+		// Schedule the event.
 		return self::add_event( $hook, $timestamp, $args, $schedule );
 	}
 
@@ -490,10 +490,10 @@ class Oli_CJ_Cron_Manager {
 		$php_code = self::get_php_code( $hook );
 		if ( $php_code ) {
 			$start_time = microtime( true );
-			$error = '';
+			$error      = '';
 
 			try {
-				// phpcs:ignore Squiz.PHP.Eval.Discouraged -- This is intentional for PHP cron events
+				// phpcs:ignore Squiz.PHP.Eval.Discouraged -- This is intentional for PHP cron events.
 				eval( $php_code );
 			} catch ( Exception $e ) {
 				$error = $e->getMessage();
@@ -515,12 +515,12 @@ class Oli_CJ_Cron_Manager {
 	 * @return bool
 	 */
 	public static function add_url_event( $hook, $timestamp, $url, $args = array(), $schedule = false ) {
-		// Store URL in option
-		$url_events = get_option( 'oli_cj_url_events', array() );
+		// Store URL in option.
+		$url_events          = get_option( 'oli_cj_url_events', array() );
 		$url_events[ $hook ] = $url;
 		update_option( 'oli_cj_url_events', $url_events );
 
-		// Schedule the event
+		// Schedule the event.
 		return self::add_event( $hook, $timestamp, $args, $schedule );
 	}
 
@@ -544,7 +544,7 @@ class Oli_CJ_Cron_Manager {
 		$url = self::get_url( $hook );
 		if ( $url ) {
 			$start_time = microtime( true );
-			$error = '';
+			$error      = '';
 
 			$response = wp_remote_get( $url, array( 'timeout' => 30 ) );
 

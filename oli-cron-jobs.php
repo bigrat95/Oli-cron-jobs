@@ -3,7 +3,7 @@
  * Plugin Name: Oli Cron Jobs
  * Plugin URI: https://github.com/bigrat95/oli-cron-jobs
  * Description: A comprehensive WP-Cron management plugin with advanced features for viewing, managing, and monitoring scheduled tasks.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Author: Olivier Bigras
  * Author URI: https://olivierbigras.com/
  * License: GPL v2 or later
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'OLI_CJ_VERSION', '0.1.0' );
+define( 'OLI_CJ_VERSION', '0.1.1' );
 define( 'OLI_CJ_PLUGIN_FILE', __FILE__ );
 define( 'OLI_CJ_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OLI_CJ_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -117,15 +117,15 @@ class Oli_CJ_Plugin {
 	 * Plugin activation
 	 */
 	public function activate() {
-		// Create logger table
+		// Create logger table.
 		Oli_CJ_Logger::create_table();
 
-		// Set default options
+		// Set default options.
 		if ( false === get_option( 'oli_cj_log_retention_days' ) ) {
 			update_option( 'oli_cj_log_retention_days', 30 );
 		}
 
-		// Flush rewrite rules if needed
+		// Flush rewrite rules if needed.
 		flush_rewrite_rules();
 	}
 
@@ -133,7 +133,7 @@ class Oli_CJ_Plugin {
 	 * Plugin deactivation
 	 */
 	public function deactivate() {
-		// Clean up if needed
+		// Clean up if needed.
 		flush_rewrite_rules();
 	}
 }
