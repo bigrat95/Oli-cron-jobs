@@ -1,0 +1,43 @@
+# Composer
+/vendor/
+composer.lock
+
+# Node
+/node_modules/
+package-lock.json
+yarn.lock
+
+# IDE
+/.vscode/
+/.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.zip
+/build/
+/dist/
+
+# Test files
+/tests/
+/phpunit.xml
+/.phpunit.result.cache
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# WordPress
+/wp-content/
+/wordpress/
+
+# Plugin Check
+/plugin-check/

@@ -1,0 +1,93 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  php-lint:
+    name: PHP Lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ['7.4', '8.0', '8.1', '8.2', '8.3']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        coverage: none
+
+    - name: PHP Lint
+      run: |
+        find . -name "*.php" -not -path "./vendor/*" -print0 | xargs -0 -n1 php -l
+
+  phpcs:
+    name: PHPCS (WordPress Coding Standards)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+        coverage: none
+        tools: composer, cs2pr
+
+    - name: Install dependencies
+      run: |
+        composer require --dev wp-coding-standards/wpcs:"^3.0" squizlabs/php_codesniffer:"^3.7" --no-interaction --prefer-dist
+
+    - name: Configure PHPCS
+      run: |
+        vendor/bin/phpcs --config-set installed_paths vendor/wp-coding-standards/wpcs
+        vendor/bin/phpcs -i
+
+    - name: Run PHPCS
+      run: |
+        vendor/bin/phpcs --standard=WordPress --extensions=php --ignore=vendor/ --report=checkstyle . | cs2pr
+
+  plugin-check:
+    name: Plugin Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+        coverage: none
+
+    - name: Check plugin structure
+      run: |
+        # Verify main plugin file exists
+        if [ ! -f "oli-cron-jobs.php" ]; then
+          echo "Error: Main plugin file not found"
+          exit 1
+        fi
+        
+        # Verify readme.txt exists
+        if [ ! -f "readme.txt" ]; then
+          echo "Error: readme.txt not found"
+          exit 1
+        fi
+        
+        # Check for text domain consistency
+        if grep -r "load_plugin_textdomain" oli-cron-jobs.php | grep -v "oli-cron-jobs"; then
+          echo "Error: Text domain mismatch"
+          exit 1
+        fi
+        
+        echo "Plugin structure checks passed"

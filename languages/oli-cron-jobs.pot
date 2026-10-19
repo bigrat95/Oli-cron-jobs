@@ -1,0 +1,153 @@
+# Copyright (C) 2026 Olivier Bigras
+# This file is distributed under the GPL v2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Oli Cron Jobs 0.1.0\n"
+"Report-Msgid-Bugs-To: https://github.com/bigrat95/oli-cron-jobs/issues\n"
+"POT-Creation-Date: 2026-10-19 17:28:00+00:00\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: 2026-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: en\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: WP-CLI\n"
+"X-Domain: oli-cron-jobs\n"
+
+#: oli-cron-jobs.php
+msgid "Oli Cron Jobs"
+msgstr ""
+
+#: oli-cron-jobs.php
+msgid "A comprehensive WP-Cron management plugin with advanced features for viewing, managing, and monitoring scheduled tasks."
+msgstr ""
+
+#: includes/class-oli-cj-cron-manager.php
+msgid "Non-repeating"
+msgstr ""
+
+#: includes/class-oli-cj-schedule-manager.php
+msgid "%d second"
+msgid_plural "%d seconds"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/class-oli-cj-schedule-manager.php
+msgid "%d minute"
+msgid_plural "%d minutes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/class-oli-cj-schedule-manager.php
+msgid "%d hour"
+msgid_plural "%d hours"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/class-oli-cj-schedule-manager.php
+msgid "%d day"
+msgid_plural "%d days"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/class-oli-cj-site-health.php
+msgid "WP-Cron Status"
+msgstr ""
+
+#: includes/class-oli-cj-site-health.php
+msgid "WP-Cron is enabled"
+msgstr ""
+
+#: includes/class-oli-cj-site-health.php
+msgid "The built-in WP-Cron system is functioning normally."
+msgstr ""
+
+#: includes/class-oli-cj-site-health.php
+msgid "WP-Cron is disabled"
+msgstr ""
+
+#: includes/class-oli-cj-site-health.php
+msgid "WP-Cron is disabled via the DISABLE_WP_CRON constant. Make sure you have set up a server cron job to trigger wp-cron.php regularly."
+msgstr ""
+
+#: includes/class-oli-cj-notices.php
+msgid "Cron Jobs"
+msgstr ""
+
+#: admin/class-oli-cj-admin.php
+msgid "Cron Events"
+msgstr ""
+
+#: admin/class-oli-cj-admin.php
+msgid "Add New"
+msgstr ""
+
+#: admin/class-oli-cj-admin.php
+msgid "Cron Schedules"
+msgstr ""
+
+#: admin/class-oli-cj-admin.php
+msgid "Cron Logs"
+msgstr ""
+
+#: admin/class-oli-cj-admin.php
+msgid "Cron Settings"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Hook"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Arguments"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Next Run"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Recurrence"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Callbacks"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Status"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Run Now"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Delete"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Pause"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Resume"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "None"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Scheduled"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Paused"
+msgstr ""
+
+#: admin/class-oli-cj-list-table.php
+msgid "Overdue"
+msgstr ""
