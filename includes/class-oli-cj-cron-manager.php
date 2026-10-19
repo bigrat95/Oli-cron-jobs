@@ -248,15 +248,125 @@ class Oli_CJ_Cron_Manager {
 		foreach ( $wp_filter[ $hook ]->callbacks as $priority => $functions ) {
 			foreach ( $functions as $function ) {
 				$callback_info = array(
-					'priority' => $priority,
-					'function' => self::format_callback( $function['function'] ),
+					'priority'      => $priority,
+					'function'      => self::format_callback( $function['function'] ),
 					'accepted_args' => $function['accepted_args'],
+					'source'        => self::get_callback_source( $function['function'] ),
 				);
 				$callbacks[] = $callback_info;
 			}
 		}
 
 		return $callbacks;
+	}
+
+	/**
+	 * Get the source (plugin/theme) of a callback
+	 *
+	 * @param mixed $callback Callback function.
+	 * @return string
+	 */
+	private static function get_callback_source( $callback ) {
+		$reflection = null;
+
+		try {
+			if ( is_string( $callback ) && function_exists( $callback ) ) {
+				$reflection = new ReflectionFunction( $callback );
+			} elseif ( is_array( $callback ) && method_exists( $callback[0], $callback[1] ) ) {
+				$reflection = new ReflectionMethod( $callback[0], $callback[1] );
+			} elseif ( is_object( $callback ) && is_callable( $callback ) ) {
+				if ( $callback instanceof Closure ) {
+					$reflection = new ReflectionFunction( $callback );
+				} else {
+					$reflection = new ReflectionMethod( $callback, '__invoke' );
+				}
+			}
+
+			if ( $reflection ) {
+				$file = $reflection->getFileName();
+				if ( $file ) {
+					return self::determine_file_source( $file );
+				}
+			}
+		} catch ( Exception $e ) {
+			// Reflection failed, return unknown
+		}
+
+		return __( 'Unknown', 'oli-cron-jobs' );
+	}
+
+	/**
+	 * Determine the source of a file (plugin, theme, or core)
+	 *
+	 * @param string $file File path.
+	 * @return string
+	 */
+	private static function determine_file_source( $file ) {
+		// WordPress core
+		if ( strpos( $file, ABSPATH . WPINC ) === 0 || strpos( $file, ABSPATH . 'wp-admin' ) === 0 ) {
+			return __( 'WordPress Core', 'oli-cron-jobs' );
+		}
+
+		// Plugin
+		if ( strpos( $file, WP_PLUGIN_DIR ) === 0 ) {
+			$relative_path = str_replace( WP_PLUGIN_DIR . '/', '', $file );
+			$plugin_slug = explode( '/', $relative_path )[0];
+			
+			// Get plugin name if available
+			if ( ! function_exists( 'get_plugins' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/plugin.php';
+			}
+			$all_plugins = get_plugins();
+			foreach ( $all_plugins as $plugin_file => $plugin_data ) {
+				if ( strpos( $plugin_file, $plugin_slug . '/' ) === 0 || $plugin_file === $plugin_slug ) {
+					return sprintf(
+						/* translators: %s: plugin name */
+						__( 'Plugin: %s', 'oli-cron-jobs' ),
+						$plugin_data['Name']
+					);
+				}
+			}
+			
+			return sprintf(
+				/* translators: %s: plugin slug */
+				__( 'Plugin: %s', 'oli-cron-jobs' ),
+				$plugin_slug
+			);
+		}
+
+		// Theme
+		if ( strpos( $file, get_theme_root() ) === 0 ) {
+			$relative_path = str_replace( get_theme_root() . '/', '', $file );
+			$theme_slug = explode( '/', $relative_path )[0];
+			
+			$theme = wp_get_theme( $theme_slug );
+			if ( $theme->exists() ) {
+				return sprintf(
+					/* translators: %s: theme name */
+					__( 'Theme: %s', 'oli-cron-jobs' ),
+					$theme->get( 'Name' )
+				);
+			}
+			
+			return sprintf(
+				/* translators: %s: theme slug */
+				__( 'Theme: %s', 'oli-cron-jobs' ),
+				$theme_slug
+			);
+		}
+
+		// MU Plugin
+		if ( defined( 'WPMU_PLUGIN_DIR' ) && strpos( $file, WPMU_PLUGIN_DIR ) === 0 ) {
+			$relative_path = str_replace( WPMU_PLUGIN_DIR . '/', '', $file );
+			$mu_plugin_file = explode( '/', $relative_path )[0];
+			return sprintf(
+				/* translators: %s: mu-plugin file name */
+				__( 'MU-Plugin: %s', 'oli-cron-jobs' ),
+				$mu_plugin_file
+			);
+		}
+
+		return __( 'Unknown', 'oli-cron-jobs' );
 	}
 
 	/**
