@@ -57,6 +57,15 @@ class Oli_CJ_Admin {
 
 		add_submenu_page(
 			'tools.php',
+			__( 'Add Cron Event', 'oli-cron-jobs' ),
+			__( 'Add Cron Event', 'oli-cron-jobs' ),
+			'manage_options',
+			'oli-cron-jobs-add',
+			array( $this, 'render_add_event_page' )
+		);
+
+		add_submenu_page(
+			'tools.php',
 			__( 'Cron Schedules', 'oli-cron-jobs' ),
 			__( 'Cron Schedules', 'oli-cron-jobs' ),
 			'manage_options',
@@ -89,7 +98,7 @@ class Oli_CJ_Admin {
 	 * @param string $hook Current admin page hook.
 	 */
 	public function enqueue_scripts( $hook ) {
-		if ( ! in_array( $hook, array( 'tools_page_oli-cron-jobs', 'tools_page_oli-cron-jobs-schedules', 'tools_page_oli-cron-jobs-logs', 'tools_page_oli-cron-jobs-settings' ), true ) ) {
+		if ( ! in_array( $hook, array( 'tools_page_oli-cron-jobs', 'tools_page_oli-cron-jobs-add', 'tools_page_oli-cron-jobs-schedules', 'tools_page_oli-cron-jobs-logs', 'tools_page_oli-cron-jobs-settings' ), true ) ) {
 			return;
 		}
 
@@ -249,6 +258,163 @@ class Oli_CJ_Admin {
 				<?php $list_table->display(); ?>
 			</form>
 		</div>
+		<?php
+	}
+
+	/**
+	 * Render add event page
+	 */
+	public function render_add_event_page() {
+		$this->render_page_header( __( 'Add Cron Event', 'oli-cron-jobs' ) );
+
+		// Handle form submission
+		if ( isset( $_POST['oli_cj_add_event'] ) && check_admin_referer( 'oli_cj_add_event' ) ) {
+			$event_type = isset( $_POST['event_type'] ) ? sanitize_text_field( wp_unslash( $_POST['event_type'] ) ) : 'standard';
+			$hook = isset( $_POST['hook'] ) ? sanitize_text_field( wp_unslash( $_POST['hook'] ) ) : '';
+			$schedule = isset( $_POST['schedule'] ) ? sanitize_text_field( wp_unslash( $_POST['schedule'] ) ) : '';
+			$timestamp = isset( $_POST['timestamp'] ) ? strtotime( wp_unslash( $_POST['timestamp'] ) ) : time();
+
+			if ( ! $timestamp ) {
+				$timestamp = time() + 3600;
+			}
+
+			$args = array();
+			if ( ! empty( $_POST['args'] ) ) {
+				$args_json = sanitize_textarea_field( wp_unslash( $_POST['args'] ) );
+				$args = json_decode( $args_json, true );
+				if ( json_last_error() !== JSON_ERROR_NONE ) {
+					$args = array();
+				}
+			}
+
+			if ( $hook ) {
+				if ( 'url' === $event_type && ! empty( $_POST['url'] ) ) {
+					$url = esc_url_raw( wp_unslash( $_POST['url'] ) );
+					Oli_CJ_Cron_Manager::add_url_event( $hook, $timestamp, $url, $args, $schedule ? $schedule : false );
+					echo '<div class="notice notice-success"><p>' . esc_html__( 'URL cron event added successfully.', 'oli-cron-jobs' ) . '</p></div>';
+				} elseif ( 'php' === $event_type && ! empty( $_POST['php_code'] ) ) {
+					if ( Oli_CJ_Cron_Manager::can_execute_php_events() ) {
+						$php_code = wp_unslash( $_POST['php_code'] );
+						Oli_CJ_Cron_Manager::add_php_event( $hook, $timestamp, $php_code, $args, $schedule ? $schedule : false );
+						echo '<div class="notice notice-success"><p>' . esc_html__( 'PHP cron event added successfully.', 'oli-cron-jobs' ) . '</p></div>';
+					} else {
+						echo '<div class="notice notice-error"><p>' . esc_html__( 'You do not have permission to create PHP cron events.', 'oli-cron-jobs' ) . '</p></div>';
+					}
+				} else {
+					Oli_CJ_Cron_Manager::add_event( $hook, $timestamp, $args, $schedule ? $schedule : false );
+					echo '<div class="notice notice-success"><p>' . esc_html__( 'Cron event added successfully.', 'oli-cron-jobs' ) . '</p></div>';
+				}
+			}
+		}
+
+		$schedules = Oli_CJ_Schedule_Manager::get_all_schedules();
+		$can_php = Oli_CJ_Cron_Manager::can_execute_php_events();
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html__( 'Add Cron Event', 'oli-cron-jobs' ); ?></h1>
+
+			<form method="post" action="">
+				<?php wp_nonce_field( 'oli_cj_add_event' ); ?>
+				
+				<table class="form-table">
+					<tr>
+						<th scope="row"><label for="event_type"><?php echo esc_html__( 'Event Type', 'oli-cron-jobs' ); ?></label></th>
+						<td>
+							<select name="event_type" id="event_type">
+								<option value="standard"><?php echo esc_html__( 'Standard Event', 'oli-cron-jobs' ); ?></option>
+								<option value="url"><?php echo esc_html__( 'URL Event', 'oli-cron-jobs' ); ?></option>
+								<?php if ( $can_php ) : ?>
+									<option value="php"><?php echo esc_html__( 'PHP Event', 'oli-cron-jobs' ); ?></option>
+								<?php endif; ?>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="hook"><?php echo esc_html__( 'Hook Name', 'oli-cron-jobs' ); ?></label></th>
+						<td>
+							<input type="text" name="hook" id="hook" class="regular-text" required />
+							<p class="description"><?php echo esc_html__( 'The name of the action hook to execute.', 'oli-cron-jobs' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="timestamp"><?php echo esc_html__( 'Next Run', 'oli-cron-jobs' ); ?></label></th>
+						<td>
+							<input type="datetime-local" name="timestamp" id="timestamp" value="<?php echo esc_attr( gmdate( 'Y-m-d\TH:i', time() + 3600 ) ); ?>" required />
+							<p class="description"><?php echo esc_html__( 'When the event should first run (in UTC).', 'oli-cron-jobs' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="schedule"><?php echo esc_html__( 'Recurrence', 'oli-cron-jobs' ); ?></label></th>
+						<td>
+							<select name="schedule" id="schedule">
+								<option value=""><?php echo esc_html__( 'Non-repeating', 'oli-cron-jobs' ); ?></option>
+								<?php foreach ( $schedules as $name => $schedule ) : ?>
+									<option value="<?php echo esc_attr( $name ); ?>">
+										<?php echo esc_html( $schedule['display'] . ' (' . Oli_CJ_Schedule_Manager::format_interval( $schedule['interval'] ) . ')' ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="args"><?php echo esc_html__( 'Arguments', 'oli-cron-jobs' ); ?></label></th>
+						<td>
+							<textarea name="args" id="args" class="large-text" rows="3" placeholder="[]"></textarea>
+							<p class="description"><?php echo esc_html__( 'JSON array of arguments to pass to the hook. Example: ["arg1", "arg2"]', 'oli-cron-jobs' ); ?></p>
+						</td>
+					</tr>
+					<tr id="url_field" style="display:none;">
+						<th scope="row"><label for="url"><?php echo esc_html__( 'URL', 'oli-cron-jobs' ); ?></label></th>
+						<td>
+							<input type="url" name="url" id="url" class="regular-text" placeholder="https://example.com/api/endpoint" />
+							<p class="description"><?php echo esc_html__( 'The URL to request when this cron event runs.', 'oli-cron-jobs' ); ?></p>
+						</td>
+					</tr>
+					<?php if ( $can_php ) : ?>
+						<tr id="php_field" style="display:none;">
+							<th scope="row"><label for="php_code"><?php echo esc_html__( 'PHP Code', 'oli-cron-jobs' ); ?></label></th>
+							<td>
+								<div class="oli-cj-php-warning">
+									<h3><?php echo esc_html__( '⚠️ Security Warning', 'oli-cron-jobs' ); ?></h3>
+									<p><?php echo esc_html__( 'PHP cron events execute arbitrary code on your server. Only use this feature if you fully understand the security implications. Incorrect code can break your site.', 'oli-cron-jobs' ); ?></p>
+								</div>
+								<textarea name="php_code" id="php_code" class="large-text code" rows="10" placeholder="<?php echo esc_attr( "// Your PHP code here\necho 'Hello World';" ); ?>"></textarea>
+								<p class="description"><?php echo esc_html__( 'PHP code to execute (without opening PHP tags).', 'oli-cron-jobs' ); ?></p>
+							</td>
+						</tr>
+					<?php elseif ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT ) : ?>
+						<tr>
+							<td colspan="2">
+								<div class="notice notice-info inline">
+									<p><?php echo esc_html__( 'PHP cron events are disabled because file editing is disabled (DISALLOW_FILE_EDIT).', 'oli-cron-jobs' ); ?></p>
+								</div>
+							</td>
+						</tr>
+					<?php endif; ?>
+				</table>
+				
+				<p class="submit">
+					<input type="submit" name="oli_cj_add_event" class="button button-primary" value="<?php echo esc_attr__( 'Add Event', 'oli-cron-jobs' ); ?>" />
+					<a href="<?php echo esc_url( admin_url( 'tools.php?page=oli-cron-jobs' ) ); ?>" class="button">
+						<?php echo esc_html__( 'Cancel', 'oli-cron-jobs' ); ?>
+					</a>
+				</p>
+			</form>
+		</div>
+		
+		<script>
+		jQuery(document).ready(function($) {
+			$('#event_type').on('change', function() {
+				var type = $(this).val();
+				$('#url_field, #php_field').hide();
+				if (type === 'url') {
+					$('#url_field').show();
+				} else if (type === 'php') {
+					$('#php_field').show();
+				}
+			});
+		});
+		</script>
 		<?php
 	}
 

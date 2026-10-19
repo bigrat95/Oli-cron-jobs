@@ -99,6 +99,7 @@ class Oli_CJ_Plugin {
 	 * Initialize plugin components
 	 */
 	public function init() {
+		Oli_CJ_Cron_Manager::init();
 		Oli_CJ_Logger::get_instance();
 		Oli_CJ_Site_Health::get_instance();
 		Oli_CJ_Notices::get_instance();

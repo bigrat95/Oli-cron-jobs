@@ -15,6 +15,64 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Oli_CJ_Cron_Manager {
 
 	/**
+	 * Initialize hooks
+	 */
+	public static function init() {
+		// Hook into all actions to execute URL and PHP events
+		add_action( 'init', array( __CLASS__, 'register_event_handlers' ), 1 );
+	}
+
+	/**
+	 * Register handlers for URL and PHP events
+	 */
+	public static function register_event_handlers() {
+		// Get all URL events
+		$url_events = get_option( 'oli_cj_url_events', array() );
+		foreach ( $url_events as $hook => $url ) {
+			add_action( $hook, array( __CLASS__, 'execute_url_event_wrapper' ) );
+		}
+
+		// Get all PHP events (only if user has proper capabilities)
+		if ( self::can_execute_php_events() ) {
+			$php_events = get_option( 'oli_cj_php_events', array() );
+			foreach ( $php_events as $hook => $code ) {
+				add_action( $hook, array( __CLASS__, 'execute_php_event_wrapper' ) );
+			}
+		}
+	}
+
+	/**
+	 * Wrapper for executing URL events
+	 */
+	public static function execute_url_event_wrapper() {
+		$hook = current_filter();
+		self::execute_url_event( $hook );
+	}
+
+	/**
+	 * Wrapper for executing PHP events
+	 */
+	public static function execute_php_event_wrapper() {
+		$hook = current_filter();
+		self::execute_php_event( $hook );
+	}
+
+	/**
+	 * Check if current user can execute PHP events
+	 *
+	 * @return bool
+	 */
+	public static function can_execute_php_events() {
+		// Disabled if file editing is disabled
+		if ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT ) {
+			return false;
+		}
+
+		// Require both edit_files and unfiltered_html capabilities
+		return current_user_can( 'edit_files' ) && current_user_can( 'unfiltered_html' );
+	}
+
+	/**
 	 * Get all cron events
 	 *
 	 * @return array
