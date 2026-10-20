@@ -47,13 +47,9 @@ jobs:
       run: |
         composer require --dev wp-coding-standards/wpcs:"^3.0" squizlabs/php_codesniffer:"^3.7" dealerdirect/phpcodesniffer-composer-installer phpcompatibility/phpcompatibility-wp:"^2.1" --no-interaction --prefer-dist
 
-    - name: Configure PHPCS
-      run: |
-        vendor/bin/phpcs --config-set installed_paths vendor/wp-coding-standards/wpcs
-        vendor/bin/phpcs -i
-
     - name: Run PHPCS
       run: |
+        set -o pipefail
         vendor/bin/phpcs --standard=WordPress --extensions=php --ignore=vendor/ --report=checkstyle . | cs2pr
 
   plugin-check:

@@ -33,16 +33,20 @@ class Oli_CJ_List_Table extends WP_List_Table {
 
 	/**
 	 * Display filter dropdowns
+	 *
+	 * @param string $which Top or bottom table nav.
 	 */
 	public function extra_tablenav( $which ) {
 		if ( 'top' !== $which ) {
 			return;
 		}
 
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Read-only list-table filters via GET.
 		$status_filter   = isset( $_REQUEST['status_filter'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['status_filter'] ) ) : '';
 		$schedule_filter = isset( $_REQUEST['schedule_filter'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['schedule_filter'] ) ) : '';
 		$type_filter     = isset( $_REQUEST['type_filter'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['type_filter'] ) ) : '';
-		$schedules       = Oli_CJ_Schedule_Manager::get_all_schedules();
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+		$schedules = Oli_CJ_Schedule_Manager::get_all_schedules();
 		?>
 		<div class="alignleft actions">
 			<select name="status_filter">
@@ -65,7 +69,8 @@ class Oli_CJ_List_Table extends WP_List_Table {
 			<select name="type_filter">
 				<option value=""><?php echo esc_html__( 'All Types', 'oli-cron-jobs' ); ?></option>
 				<option value="core" <?php selected( $type_filter, 'core' ); ?>><?php echo esc_html__( 'WordPress Core', 'oli-cron-jobs' ); ?></option>
-				<option value="custom" <?php selected( $type_filter, 'custom' ); ?>><?php echo esc_html__( 'Plugin/Theme', 'oli-cron-jobs' ); ?></option>
+				<option value="plugin" <?php selected( $type_filter, 'plugin' ); ?>><?php echo esc_html__( 'Plugin', 'oli-cron-jobs' ); ?></option>
+				<option value="custom" <?php selected( $type_filter, 'custom' ); ?>><?php echo esc_html__( 'Custom', 'oli-cron-jobs' ); ?></option>
 				<option value="url" <?php selected( $type_filter, 'url' ); ?>><?php echo esc_html__( 'URL Events', 'oli-cron-jobs' ); ?></option>
 				<option value="php" <?php selected( $type_filter, 'php' ); ?>><?php echo esc_html__( 'PHP Events', 'oli-cron-jobs' ); ?></option>
 			</select>
@@ -128,7 +133,11 @@ class Oli_CJ_List_Table extends WP_List_Table {
 
 		$this->_column_headers = array( $columns, $hidden, $sortable );
 
+		$this->process_bulk_action();
+
 		$events = Oli_CJ_Cron_Manager::get_all_events();
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Read-only list-table filters via GET.
 
 		// Filter by status.
 		if ( isset( $_REQUEST['status_filter'] ) && ! empty( $_REQUEST['status_filter'] ) ) {
@@ -170,20 +179,7 @@ class Oli_CJ_List_Table extends WP_List_Table {
 			$events      = array_filter(
 				$events,
 				function ( $event ) use ( $type_filter ) {
-					$hook = $event['hook'];
-					if ( 'url' === $type_filter ) {
-						return Oli_CJ_Cron_Manager::get_url( $hook ) !== false;
-					} elseif ( 'php' === $type_filter ) {
-						return Oli_CJ_Cron_Manager::get_php_code( $hook ) !== false;
-					} elseif ( 'core' === $type_filter ) {
-						return strpos( $hook, 'wp_' ) === 0;
-					} elseif ( 'custom' === $type_filter ) {
-						$is_url  = Oli_CJ_Cron_Manager::get_url( $hook ) !== false;
-						$is_php  = Oli_CJ_Cron_Manager::get_php_code( $hook ) !== false;
-						$is_core = strpos( $hook, 'wp_' ) === 0;
-						return ! $is_url && ! $is_php && ! $is_core;
-					}
-					return true;
+					return Oli_CJ_Cron_Manager::get_event_kind( $event['hook'] ) === $type_filter;
 				}
 			);
 		}
@@ -202,6 +198,7 @@ class Oli_CJ_List_Table extends WP_List_Table {
 		// Sort.
 		$orderby = isset( $_REQUEST['orderby'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['orderby'] ) ) : 'timestamp';
 		$order   = isset( $_REQUEST['order'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['order'] ) ) : 'asc';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		usort(
 			$events,
@@ -226,6 +223,33 @@ class Oli_CJ_List_Table extends WP_List_Table {
 		);
 
 		$this->items = array_slice( $events, ( ( $current_page - 1 ) * $per_page ), $per_page );
+	}
+
+	/**
+	 * Process bulk actions
+	 */
+	public function process_bulk_action() {
+		if ( 'delete' !== $this->current_action() ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		check_admin_referer( 'bulk-' . $this->_args['plural'] );
+
+		$packed_events = array();
+		if ( isset( $_REQUEST['event'] ) && is_array( $_REQUEST['event'] ) ) {
+			$packed_events = array_map( 'sanitize_text_field', wp_unslash( $_REQUEST['event'] ) );
+		}
+
+		foreach ( $packed_events as $packed ) {
+			$parts = explode( '|', $packed );
+			if ( 3 === count( $parts ) ) {
+				Oli_CJ_Cron_Manager::delete_event( $parts[0], absint( $parts[1] ), $parts[2] );
+			}
+		}
 	}
 
 	/**
@@ -256,19 +280,19 @@ class Oli_CJ_List_Table extends WP_List_Table {
 
 		$actions['run'] = sprintf(
 			'<a href="%s">%s</a>',
-			esc_url( admin_url( 'tools.php?page=oli-cron-jobs&action=run_now&hook=' . urlencode( $item['hook'] ) . '&args=' . urlencode( wp_json_encode( $item['args'] ) ) . '&_wpnonce=' . $nonce ) ),
+			esc_url( admin_url( 'tools.php?page=oli-cron-jobs&action=run_now&hook=' . rawurlencode( $item['hook'] ) . '&args=' . rawurlencode( wp_json_encode( $item['args'] ) ) . '&_wpnonce=' . $nonce ) ),
 			__( 'Run Now', 'oli-cron-jobs' )
 		);
 
 		$actions['edit'] = sprintf(
 			'<a href="%s">%s</a>',
-			esc_url( admin_url( 'tools.php?page=oli-cron-jobs-edit&hook=' . urlencode( $item['hook'] ) . '&timestamp=' . $item['timestamp'] . '&sig=' . urlencode( $item['sig'] ) ) ),
+			esc_url( admin_url( 'tools.php?page=oli-cron-jobs-edit&hook=' . rawurlencode( $item['hook'] ) . '&timestamp=' . $item['timestamp'] . '&sig=' . rawurlencode( $item['sig'] ) ) ),
 			__( 'Edit', 'oli-cron-jobs' )
 		);
 
 		$actions['delete'] = sprintf(
 			'<a href="%s" class="delete" onclick="return confirm(\'%s\');">%s</a>',
-			esc_url( admin_url( 'tools.php?page=oli-cron-jobs&action=delete_event&hook=' . urlencode( $item['hook'] ) . '&timestamp=' . $item['timestamp'] . '&sig=' . urlencode( $item['sig'] ) . '&_wpnonce=' . $nonce ) ),
+			esc_url( admin_url( 'tools.php?page=oli-cron-jobs&action=delete_event&hook=' . rawurlencode( $item['hook'] ) . '&timestamp=' . $item['timestamp'] . '&sig=' . rawurlencode( $item['sig'] ) . '&_wpnonce=' . $nonce ) ),
 			esc_js( __( 'Are you sure?', 'oli-cron-jobs' ) ),
 			__( 'Delete', 'oli-cron-jobs' )
 		);
@@ -276,13 +300,13 @@ class Oli_CJ_List_Table extends WP_List_Table {
 		if ( Oli_CJ_Cron_Manager::is_hook_paused( $item['hook'] ) ) {
 			$actions['resume'] = sprintf(
 				'<a href="%s">%s</a>',
-				esc_url( admin_url( 'tools.php?page=oli-cron-jobs&action=resume_hook&hook=' . urlencode( $item['hook'] ) . '&_wpnonce=' . $nonce ) ),
+				esc_url( admin_url( 'tools.php?page=oli-cron-jobs&action=resume_hook&hook=' . rawurlencode( $item['hook'] ) . '&_wpnonce=' . $nonce ) ),
 				__( 'Resume', 'oli-cron-jobs' )
 			);
 		} else {
 			$actions['pause'] = sprintf(
 				'<a href="%s">%s</a>',
-				esc_url( admin_url( 'tools.php?page=oli-cron-jobs&action=pause_hook&hook=' . urlencode( $item['hook'] ) . '&_wpnonce=' . $nonce ) ),
+				esc_url( admin_url( 'tools.php?page=oli-cron-jobs&action=pause_hook&hook=' . rawurlencode( $item['hook'] ) . '&_wpnonce=' . $nonce ) ),
 				__( 'Pause', 'oli-cron-jobs' )
 			);
 		}
@@ -320,12 +344,14 @@ class Oli_CJ_List_Table extends WP_List_Table {
 			return sprintf(
 				'<span style="color: red;">%s</span><br /><small>%s</small>',
 				esc_html( get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $timestamp ), get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ) ),
+				/* translators: %s: human-readable time difference */
 				esc_html( sprintf( __( '%s ago', 'oli-cron-jobs' ), human_time_diff( $timestamp, $current_time ) ) )
 			);
 		} else {
 			return sprintf(
 				'%s<br /><small>%s</small>',
 				esc_html( get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $timestamp ), get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ) ),
+				/* translators: %s: human-readable time difference */
 				esc_html( sprintf( __( 'in %s', 'oli-cron-jobs' ), human_time_diff( $current_time, $timestamp ) ) )
 			);
 		}

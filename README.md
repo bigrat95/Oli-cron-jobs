@@ -1,6 +1,6 @@
 # Oli Cron Jobs
 
-[![Code Quality](https://github.com/bigrat95/oli-cron-jobs/actions/workflows/code-quality.yml/badge.svg)](https://github.com/bigrat95/oli-cron-jobs/actions/workflows/code-quality.yml)
+[![Code Quality](https://github.com/olivierbigras/Oli-cron-jobs/actions/workflows/code-quality.yml/badge.svg)](https://github.com/olivierbigras/Oli-cron-jobs/actions/workflows/code-quality.yml)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)
 [![WordPress](https://img.shields.io/badge/WordPress-6.5%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple.svg)](https://php.net/)
@@ -77,7 +77,7 @@ wp oli-cron resume my_custom_hook
 
 ```bash
 cd wp-content/plugins/
-git clone https://github.com/bigrat95/oli-cron-jobs.git
+git clone https://github.com/olivierbigras/Oli-cron-jobs.git
 ```
 
 ## Requirements
@@ -176,7 +176,7 @@ Contributions are welcome! Please:
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/bigrat95/oli-cron-jobs/issues)
+- **Issues**: [GitHub Issues](https://github.com/olivierbigras/Oli-cron-jobs/issues)
 - **Documentation**: See readme.txt for detailed WordPress.org style docs
 
 ## License

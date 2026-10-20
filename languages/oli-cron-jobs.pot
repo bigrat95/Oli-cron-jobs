@@ -2,8 +2,8 @@
 # This file is distributed under the GPL v2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Oli Cron Jobs 0.1.0\n"
-"Report-Msgid-Bugs-To: https://github.com/bigrat95/oli-cron-jobs/issues\n"
+"Project-Id-Version: Oli Cron Jobs 0.1.1\n"
+"Report-Msgid-Bugs-To: https://github.com/olivierbigras/Oli-cron-jobs/issues\n"
 "POT-Creation-Date: 2026-10-19 17:28:00+00:00\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"

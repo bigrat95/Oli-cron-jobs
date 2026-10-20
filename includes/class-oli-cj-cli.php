@@ -105,10 +105,12 @@ class Oli_CJ_CLI {
 			}
 		}
 
+		/* translators: %s: cron hook name */
 		WP_CLI::log( sprintf( __( 'Running cron event: %s', 'oli-cron-jobs' ), $hook ) );
 
 		Oli_CJ_Cron_Manager::run_event_now( $hook, $event_args );
 
+		/* translators: %s: cron hook name */
 		WP_CLI::success( sprintf( __( 'Cron event %s has been executed.', 'oli-cron-jobs' ), $hook ) );
 	}
 
@@ -150,6 +152,7 @@ class Oli_CJ_CLI {
 					)
 				);
 			} else {
+				/* translators: %s: cron hook name */
 				WP_CLI::warning( sprintf( __( 'No events found for hook: %s', 'oli-cron-jobs' ), $hook ) );
 			}
 		} else {
@@ -173,11 +176,14 @@ class Oli_CJ_CLI {
 	 * @param array $assoc_args Associative arguments.
 	 */
 	public function pause( $args, $assoc_args ) {
+		unset( $assoc_args );
 		$hook = $args[0];
 
 		if ( Oli_CJ_Cron_Manager::pause_hook( $hook ) ) {
+			/* translators: %s: cron hook name */
 			WP_CLI::success( sprintf( __( 'Hook %s has been paused.', 'oli-cron-jobs' ), $hook ) );
 		} else {
+			/* translators: %s: cron hook name */
 			WP_CLI::error( sprintf( __( 'Failed to pause hook: %s', 'oli-cron-jobs' ), $hook ) );
 		}
 	}
@@ -198,11 +204,14 @@ class Oli_CJ_CLI {
 	 * @param array $assoc_args Associative arguments.
 	 */
 	public function resume( $args, $assoc_args ) {
+		unset( $assoc_args );
 		$hook = $args[0];
 
 		if ( Oli_CJ_Cron_Manager::resume_hook( $hook ) ) {
+			/* translators: %s: cron hook name */
 			WP_CLI::success( sprintf( __( 'Hook %s has been resumed.', 'oli-cron-jobs' ), $hook ) );
 		} else {
+			/* translators: %s: cron hook name */
 			WP_CLI::error( sprintf( __( 'Failed to resume hook: %s', 'oli-cron-jobs' ), $hook ) );
 		}
 	}

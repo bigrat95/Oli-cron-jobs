@@ -14,14 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Edit PHP code for PHP events (with same capability restrictions)
   - Full validation and security checks
 - Export/Import functionality
-  - Export all events, custom schedules, and paused hooks as JSON
+  - Export custom/managed events, custom schedules, and paused hooks as JSON
   - Import previously exported data
   - Available from Settings page
   - Preserves all event types including URL and PHP events
 - Advanced filtering system
   - Filter by status: scheduled, overdue, paused
   - Filter by schedule type: single events or specific schedules
-  - Filter by hook type: core (wp_*), plugin/theme, URL events, PHP events
+  - Filter by hook type: core, plugin, custom, URL, PHP
   - Combined search and filter capabilities
 - Plugin/theme source detection for callbacks
   - Shows which plugin or theme registered each callback
@@ -44,12 +44,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Better error handling for edge cases
 
 ### Technical
-- Ran PHP lint across all supported versions (7.4-8.3)
-- Applied PHPCS WordPress Coding Standards
-- Auto-fixed 116 formatting issues with PHPCBF
-- Reduced errors from 82 to 31 through systematic fixes
+- PHP lint (`php -l`) clean on all plugin PHP files
+- PHPCS WordPress standard clean (0 errors, 0 warnings)
+- GitHub repository URLs updated to `github.com/olivierbigras/Oli-cron-jobs`
 - Added reflection-based source detection
-- Improved filter performance with optimized queries
+- PHP cron events now execute under server cron even when no user is logged in
+- GitHub Actions PHPCS job fails the pipeline when the standard is not clean
 
 ## [0.1.0] - 2026-10-19
 
@@ -127,4 +127,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Object-oriented architecture
 - Proper WordPress hooks and filters integration
 
-[0.1.0]: https://github.com/bigrat95/oli-cron-jobs/releases/tag/0.1.0
+[0.1.1]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.1
+[0.1.0]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.0

@@ -122,14 +122,14 @@ class Oli_CJ_Site_Health {
 		$doing_wp_cron = sprintf( '%.22F', microtime( true ) );
 
 		$cron_request = apply_filters(
-			'cron_request',
+			'cron_request', // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core filter.
 			array(
 				'url'  => add_query_arg( 'doing_wp_cron', $doing_wp_cron, $cron_url ),
 				'key'  => $doing_wp_cron,
 				'args' => array(
 					'timeout'   => 3,
 					'blocking'  => true,
-					'sslverify' => apply_filters( 'https_local_ssl_verify', false ),
+					'sslverify' => apply_filters( 'https_local_ssl_verify', false ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core filter.
 				),
 			)
 		);

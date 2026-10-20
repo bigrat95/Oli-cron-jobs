@@ -176,6 +176,10 @@ class Oli_CJ_Admin {
 	 * Handle delete event action
 	 */
 	private function handle_delete_event() {
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'oli_cj_action' ) ) {
+			return;
+		}
+
 		$hook      = isset( $_GET['hook'] ) ? sanitize_text_field( wp_unslash( $_GET['hook'] ) ) : '';
 		$timestamp = isset( $_GET['timestamp'] ) ? absint( $_GET['timestamp'] ) : 0;
 		$sig       = isset( $_GET['sig'] ) ? sanitize_text_field( wp_unslash( $_GET['sig'] ) ) : '';
@@ -190,6 +194,10 @@ class Oli_CJ_Admin {
 	 * Handle run now action
 	 */
 	private function handle_run_now() {
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'oli_cj_action' ) ) {
+			return;
+		}
+
 		$hook      = isset( $_GET['hook'] ) ? sanitize_text_field( wp_unslash( $_GET['hook'] ) ) : '';
 		$args_json = isset( $_GET['args'] ) ? sanitize_text_field( wp_unslash( $_GET['args'] ) ) : '[]';
 		$args      = json_decode( $args_json, true );
@@ -204,6 +212,10 @@ class Oli_CJ_Admin {
 	 * Handle pause hook action
 	 */
 	private function handle_pause_hook() {
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'oli_cj_action' ) ) {
+			return;
+		}
+
 		$hook = isset( $_GET['hook'] ) ? sanitize_text_field( wp_unslash( $_GET['hook'] ) ) : '';
 
 		if ( Oli_CJ_Cron_Manager::pause_hook( $hook ) ) {
@@ -216,6 +228,10 @@ class Oli_CJ_Admin {
 	 * Handle resume hook action
 	 */
 	private function handle_resume_hook() {
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'oli_cj_action' ) ) {
+			return;
+		}
+
 		$hook = isset( $_GET['hook'] ) ? sanitize_text_field( wp_unslash( $_GET['hook'] ) ) : '';
 
 		if ( Oli_CJ_Cron_Manager::resume_hook( $hook ) ) {
@@ -228,6 +244,10 @@ class Oli_CJ_Admin {
 	 * Handle delete schedule action
 	 */
 	private function handle_delete_schedule() {
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'oli_cj_action' ) ) {
+			return;
+		}
+
 		$schedule = isset( $_GET['schedule'] ) ? sanitize_text_field( wp_unslash( $_GET['schedule'] ) ) : '';
 
 		if ( Oli_CJ_Schedule_Manager::delete_schedule( $schedule ) ) {
@@ -250,6 +270,10 @@ class Oli_CJ_Admin {
 	 * Handle export action
 	 */
 	private function handle_export() {
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'oli_cj_action' ) ) {
+			return;
+		}
+
 		$export_data = array(
 			'version'          => OLI_CJ_VERSION,
 			'export_date'      => current_time( 'mysql' ),
@@ -258,9 +282,12 @@ class Oli_CJ_Admin {
 			'paused_hooks'     => get_option( 'oli_cj_paused_hooks', array() ),
 		);
 
-		// Get all events.
+		// Export custom/managed events only (URL, PHP, and events created here).
 		$events = Oli_CJ_Cron_Manager::get_all_events();
 		foreach ( $events as $event ) {
+			if ( ! Oli_CJ_Cron_Manager::is_managed( $event['hook'] ) ) {
+				continue;
+			}
 			$event_data = array(
 				'hook'      => $event['hook'],
 				'args'      => $event['args'],
@@ -296,12 +323,23 @@ class Oli_CJ_Admin {
 	 * Handle import action
 	 */
 	private function handle_import() {
-		if ( ! isset( $_FILES['import_file'] ) || UPLOAD_ERR_OK !== $_FILES['import_file']['error'] ) {
+		if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'oli_cj_import' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'oli-cron-jobs' ) );
+		}
+
+		if ( ! isset( $_FILES['import_file'] ) || ! isset( $_FILES['import_file']['error'] ) || UPLOAD_ERR_OK !== (int) $_FILES['import_file']['error'] ) {
 			wp_safe_redirect( add_query_arg( 'message', 'import_error', admin_url( 'tools.php?page=oli-cron-jobs-settings' ) ) );
 			exit;
 		}
 
-		$file_contents = file_get_contents( $_FILES['import_file']['tmp_name'] );
+		$tmp_name = isset( $_FILES['import_file']['tmp_name'] ) ? sanitize_text_field( wp_unslash( $_FILES['import_file']['tmp_name'] ) ) : '';
+		if ( '' === $tmp_name || ! is_uploaded_file( $tmp_name ) ) {
+			wp_safe_redirect( add_query_arg( 'message', 'import_error', admin_url( 'tools.php?page=oli-cron-jobs-settings' ) ) );
+			exit;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local uploaded JSON file.
+		$file_contents = file_get_contents( $tmp_name );
 		$import_data   = json_decode( $file_contents, true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $import_data ) ) {
@@ -393,10 +431,11 @@ class Oli_CJ_Admin {
 
 		// Handle form submission.
 		if ( isset( $_POST['oli_cj_add_event'] ) && check_admin_referer( 'oli_cj_add_event' ) ) {
-			$event_type = isset( $_POST['event_type'] ) ? sanitize_text_field( wp_unslash( $_POST['event_type'] ) ) : 'standard';
-			$hook       = isset( $_POST['hook'] ) ? sanitize_text_field( wp_unslash( $_POST['hook'] ) ) : '';
-			$schedule   = isset( $_POST['schedule'] ) ? sanitize_text_field( wp_unslash( $_POST['schedule'] ) ) : '';
-			$timestamp  = isset( $_POST['timestamp'] ) ? strtotime( wp_unslash( $_POST['timestamp'] ) ) : time();
+			$event_type    = isset( $_POST['event_type'] ) ? sanitize_text_field( wp_unslash( $_POST['event_type'] ) ) : 'standard';
+			$hook          = isset( $_POST['hook'] ) ? sanitize_text_field( wp_unslash( $_POST['hook'] ) ) : '';
+			$schedule      = isset( $_POST['schedule'] ) ? sanitize_text_field( wp_unslash( $_POST['schedule'] ) ) : '';
+			$timestamp_raw = isset( $_POST['timestamp'] ) ? sanitize_text_field( wp_unslash( $_POST['timestamp'] ) ) : '';
+			$timestamp     = $timestamp_raw ? strtotime( $timestamp_raw ) : time();
 
 			if ( ! $timestamp ) {
 				$timestamp = time() + 3600;
@@ -418,7 +457,8 @@ class Oli_CJ_Admin {
 					echo '<div class="notice notice-success"><p>' . esc_html__( 'URL cron event added successfully.', 'oli-cron-jobs' ) . '</p></div>';
 				} elseif ( 'php' === $event_type && ! empty( $_POST['php_code'] ) ) {
 					if ( Oli_CJ_Cron_Manager::can_execute_php_events() ) {
-						$php_code = wp_unslash( $_POST['php_code'] );
+						// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- PHP events store privileged raw code.
+						$php_code = isset( $_POST['php_code'] ) ? wp_unslash( $_POST['php_code'] ) : '';
 						Oli_CJ_Cron_Manager::add_php_event( $hook, $timestamp, $php_code, $args, $schedule ? $schedule : false );
 						echo '<div class="notice notice-success"><p>' . esc_html__( 'PHP cron event added successfully.', 'oli-cron-jobs' ) . '</p></div>';
 					} else {
@@ -548,10 +588,11 @@ class Oli_CJ_Admin {
 	public function render_edit_event_page() {
 		$this->render_page_header( __( 'Edit Cron Event', 'oli-cron-jobs' ) );
 
-		// Get event details.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Edit screen is capability-gated; identifiers come from admin links.
 		$hook      = isset( $_GET['hook'] ) ? sanitize_text_field( wp_unslash( $_GET['hook'] ) ) : '';
 		$timestamp = isset( $_GET['timestamp'] ) ? absint( $_GET['timestamp'] ) : 0;
 		$sig       = isset( $_GET['sig'] ) ? sanitize_text_field( wp_unslash( $_GET['sig'] ) ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		if ( ! $hook || ! $timestamp || ! $sig ) {
 			wp_die( esc_html__( 'Invalid event parameters.', 'oli-cron-jobs' ) );
@@ -575,10 +616,11 @@ class Oli_CJ_Admin {
 
 		// Handle form submission.
 		if ( isset( $_POST['oli_cj_edit_event'] ) && check_admin_referer( 'oli_cj_edit_event' ) ) {
-			$new_event_type = isset( $_POST['event_type'] ) ? sanitize_text_field( wp_unslash( $_POST['event_type'] ) ) : 'standard';
-			$new_hook       = isset( $_POST['hook'] ) ? sanitize_text_field( wp_unslash( $_POST['hook'] ) ) : '';
-			$new_schedule   = isset( $_POST['schedule'] ) ? sanitize_text_field( wp_unslash( $_POST['schedule'] ) ) : '';
-			$new_timestamp  = isset( $_POST['timestamp'] ) ? strtotime( wp_unslash( $_POST['timestamp'] ) ) : time();
+			$new_event_type    = isset( $_POST['event_type'] ) ? sanitize_text_field( wp_unslash( $_POST['event_type'] ) ) : 'standard';
+			$new_hook          = isset( $_POST['hook'] ) ? sanitize_text_field( wp_unslash( $_POST['hook'] ) ) : '';
+			$new_schedule      = isset( $_POST['schedule'] ) ? sanitize_text_field( wp_unslash( $_POST['schedule'] ) ) : '';
+			$new_timestamp_raw = isset( $_POST['timestamp'] ) ? sanitize_text_field( wp_unslash( $_POST['timestamp'] ) ) : '';
+			$new_timestamp     = $new_timestamp_raw ? strtotime( $new_timestamp_raw ) : time();
 
 			if ( ! $new_timestamp ) {
 				$new_timestamp = time() + 3600;
@@ -603,7 +645,8 @@ class Oli_CJ_Admin {
 					Oli_CJ_Cron_Manager::add_url_event( $new_hook, $new_timestamp, $new_url, $new_args, $new_schedule ? $new_schedule : false );
 				} elseif ( 'php' === $new_event_type && ! empty( $_POST['php_code'] ) ) {
 					if ( Oli_CJ_Cron_Manager::can_execute_php_events() ) {
-						$new_php_code = wp_unslash( $_POST['php_code'] );
+						// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- PHP events store privileged raw code.
+						$new_php_code = isset( $_POST['php_code'] ) ? wp_unslash( $_POST['php_code'] ) : '';
 						Oli_CJ_Cron_Manager::add_php_event( $new_hook, $new_timestamp, $new_php_code, $new_args, $new_schedule ? $new_schedule : false );
 					}
 				} else {
@@ -830,8 +873,8 @@ class Oli_CJ_Admin {
 				<?php
 				echo esc_html(
 					sprintf(
-						/* translators: %d: number of log entries */
-						_n( 'Showing %d log entry', 'Showing %1$d of %2$d log entries', count( $logs ), 'oli-cron-jobs' ),
+						/* translators: 1: number of log entries shown, 2: total log entries */
+						__( 'Showing %1$d of %2$d log entries', 'oli-cron-jobs' ),
 						count( $logs ),
 						$total_logs
 					)
@@ -942,7 +985,7 @@ class Oli_CJ_Admin {
 			<h2><?php echo esc_html__( 'Export / Import', 'oli-cron-jobs' ); ?></h2>
 			
 			<h3><?php echo esc_html__( 'Export Events and Schedules', 'oli-cron-jobs' ); ?></h3>
-			<p><?php echo esc_html__( 'Export all cron events, custom schedules, and paused hooks as a JSON file.', 'oli-cron-jobs' ); ?></p>
+			<p><?php echo esc_html__( 'Export custom cron events, custom schedules, and paused hooks as a JSON file.', 'oli-cron-jobs' ); ?></p>
 			<p>
 				<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'tools.php?page=oli-cron-jobs-settings&action=export' ), 'oli_cj_action' ) ); ?>" class="button button-secondary">
 					<?php echo esc_html__( 'Export Data', 'oli-cron-jobs' ); ?>
@@ -977,10 +1020,12 @@ class Oli_CJ_Admin {
 	 * Render admin messages
 	 */
 	private function render_messages() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only redirect message.
 		if ( ! isset( $_GET['message'] ) ) {
 			return;
 		}
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only redirect message.
 		$message  = sanitize_text_field( wp_unslash( $_GET['message'] ) );
 		$messages = array(
 			'event_deleted'    => __( 'Event deleted successfully.', 'oli-cron-jobs' ),

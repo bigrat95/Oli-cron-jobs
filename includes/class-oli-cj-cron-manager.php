@@ -32,8 +32,8 @@ class Oli_CJ_Cron_Manager {
 			add_action( $hook, array( __CLASS__, 'execute_url_event_wrapper' ) );
 		}
 
-		// Get all PHP events (only if user has proper capabilities).
-		if ( self::can_execute_php_events() ) {
+		// PHP events still run via cron unless file editing is disabled.
+		if ( ! defined( 'DISALLOW_FILE_EDIT' ) || ! DISALLOW_FILE_EDIT ) {
 			$php_events = get_option( 'oli_cj_php_events', array() );
 			foreach ( $php_events as $hook => $code ) {
 				add_action( $hook, array( __CLASS__, 'execute_php_event_wrapper' ) );
@@ -137,10 +137,104 @@ class Oli_CJ_Cron_Manager {
 	 */
 	public static function add_event( $hook, $timestamp, $args = array(), $schedule = false ) {
 		if ( $schedule ) {
-			return wp_schedule_event( $timestamp, $schedule, $hook, $args );
+			$result = wp_schedule_event( $timestamp, $schedule, $hook, $args );
 		} else {
-			return wp_schedule_single_event( $timestamp, $hook, $args );
+			$result = wp_schedule_single_event( $timestamp, $hook, $args );
 		}
+
+		if ( false !== $result ) {
+			self::mark_managed( $hook );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Remember a hook created through this plugin.
+	 *
+	 * @param string $hook Hook name.
+	 */
+	public static function mark_managed( $hook ) {
+		$managed = get_option( 'oli_cj_managed_hooks', array() );
+		if ( ! in_array( $hook, $managed, true ) ) {
+			$managed[] = $hook;
+			update_option( 'oli_cj_managed_hooks', $managed );
+		}
+	}
+
+	/**
+	 * Whether this plugin created or owns the hook.
+	 *
+	 * @param string $hook Hook name.
+	 * @return bool
+	 */
+	public static function is_managed( $hook ) {
+		if ( false !== self::get_url( $hook ) || false !== self::get_php_code( $hook ) ) {
+			return true;
+		}
+
+		$managed = get_option( 'oli_cj_managed_hooks', array() );
+		return in_array( $hook, $managed, true );
+	}
+
+	/**
+	 * Classify a hook for filters: url, php, core, plugin, or custom.
+	 *
+	 * @param string $hook Hook name.
+	 * @return string
+	 */
+	public static function get_event_kind( $hook ) {
+		if ( false !== self::get_url( $hook ) ) {
+			return 'url';
+		}
+
+		if ( false !== self::get_php_code( $hook ) ) {
+			return 'php';
+		}
+
+		$callbacks  = self::get_hook_callbacks( $hook );
+		$has_plugin = false;
+		$has_core   = false;
+
+		foreach ( $callbacks as $callback ) {
+			if ( in_array( $callback['source_type'], array( 'plugin', 'mu-plugin' ), true ) ) {
+				$has_plugin = true;
+			}
+			if ( 'core' === $callback['source_type'] ) {
+				$has_core = true;
+			}
+		}
+
+		if ( $has_plugin ) {
+			return 'plugin';
+		}
+
+		if ( $has_core ) {
+			return 'core';
+		}
+
+		if ( self::is_managed( $hook ) ) {
+			return 'custom';
+		}
+
+		$core_hooks = array(
+			'wp_version_check',
+			'wp_update_plugins',
+			'wp_update_themes',
+			'wp_scheduled_delete',
+			'delete_expired_transients',
+			'wp_scheduled_auto_draft_delete',
+			'wp_privacy_delete_old_export_files',
+			'recovery_mode_clean_expired_keys',
+			'wp_site_health_scheduled_check',
+			'publish_future_post',
+		);
+
+		if ( in_array( $hook, $core_hooks, true ) ) {
+			return 'core';
+		}
+
+		return 'custom';
 	}
 
 	/**
@@ -201,6 +295,7 @@ class Oli_CJ_Cron_Manager {
 		$start_time = microtime( true );
 
 		// Run the event.
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- Runs the selected cron hook.
 		do_action_ref_array( $hook, $args );
 
 		$duration = microtime( true ) - $start_time;
@@ -247,11 +342,13 @@ class Oli_CJ_Cron_Manager {
 		$callbacks = array();
 		foreach ( $wp_filter[ $hook ]->callbacks as $priority => $functions ) {
 			foreach ( $functions as $function ) {
+				$source        = self::get_callback_source( $function['function'] );
 				$callback_info = array(
 					'priority'      => $priority,
 					'function'      => self::format_callback( $function['function'] ),
 					'accepted_args' => $function['accepted_args'],
-					'source'        => self::get_callback_source( $function['function'] ),
+					'source'        => $source['label'],
+					'source_type'   => $source['type'],
 				);
 				$callbacks[]   = $callback_info;
 			}
@@ -264,7 +361,7 @@ class Oli_CJ_Cron_Manager {
 	 * Get the source (plugin/theme) of a callback
 	 *
 	 * @param mixed $callback Callback function.
-	 * @return string
+	 * @return array
 	 */
 	private static function get_callback_source( $callback ) {
 		$reflection = null;
@@ -288,85 +385,95 @@ class Oli_CJ_Cron_Manager {
 					return self::determine_file_source( $file );
 				}
 			}
-		} catch ( Exception $e ) {
-			// Reflection failed, return unknown.
+		} catch ( Exception $exception ) {
+			unset( $exception );
 		}
 
-		return __( 'Unknown', 'oli-cron-jobs' );
+		return array(
+			'type'  => 'unknown',
+			'label' => __( 'Unknown', 'oli-cron-jobs' ),
+		);
 	}
 
 	/**
 	 * Determine the source of a file (plugin, theme, or core)
 	 *
 	 * @param string $file File path.
-	 * @return string
+	 * @return array
 	 */
 	private static function determine_file_source( $file ) {
-		// WordPress core.
 		if ( strpos( $file, ABSPATH . WPINC ) === 0 || strpos( $file, ABSPATH . 'wp-admin' ) === 0 ) {
-			return __( 'WordPress Core', 'oli-cron-jobs' );
+			return array(
+				'type'  => 'core',
+				'label' => __( 'WordPress Core', 'oli-cron-jobs' ),
+			);
 		}
 
-		// Plugin.
 		if ( strpos( $file, WP_PLUGIN_DIR ) === 0 ) {
 			$relative_path = str_replace( WP_PLUGIN_DIR . '/', '', $file );
 			$plugin_slug   = explode( '/', $relative_path )[0];
 
-			// Get plugin name if available.
 			if ( ! function_exists( 'get_plugins' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/plugin.php';
 			}
 			$all_plugins = get_plugins();
 			foreach ( $all_plugins as $plugin_file => $plugin_data ) {
 				if ( strpos( $plugin_file, $plugin_slug . '/' ) === 0 || $plugin_file === $plugin_slug ) {
-					return sprintf(
-						/* translators: %s: plugin name */
-						__( 'Plugin: %s', 'oli-cron-jobs' ),
-						$plugin_data['Name']
+					return array(
+						'type'  => 'plugin',
+						'label' => sprintf(
+							/* translators: %s: plugin name */
+							__( 'Plugin: %s', 'oli-cron-jobs' ),
+							$plugin_data['Name']
+						),
 					);
 				}
 			}
 
-			return sprintf(
-				/* translators: %s: plugin slug */
-				__( 'Plugin: %s', 'oli-cron-jobs' ),
-				$plugin_slug
+			return array(
+				'type'  => 'plugin',
+				'label' => sprintf(
+					/* translators: %s: plugin slug */
+					__( 'Plugin: %s', 'oli-cron-jobs' ),
+					$plugin_slug
+				),
 			);
 		}
 
-		// Theme.
 		if ( strpos( $file, get_theme_root() ) === 0 ) {
 			$relative_path = str_replace( get_theme_root() . '/', '', $file );
 			$theme_slug    = explode( '/', $relative_path )[0];
 
 			$theme = wp_get_theme( $theme_slug );
-			if ( $theme->exists() ) {
-				return sprintf(
+			$label = $theme->exists() ? $theme->get( 'Name' ) : $theme_slug;
+
+			return array(
+				'type'  => 'theme',
+				'label' => sprintf(
 					/* translators: %s: theme name */
 					__( 'Theme: %s', 'oli-cron-jobs' ),
-					$theme->get( 'Name' )
-				);
-			}
-
-			return sprintf(
-				/* translators: %s: theme slug */
-				__( 'Theme: %s', 'oli-cron-jobs' ),
-				$theme_slug
+					$label
+				),
 			);
 		}
 
-		// MU Plugin.
 		if ( defined( 'WPMU_PLUGIN_DIR' ) && strpos( $file, WPMU_PLUGIN_DIR ) === 0 ) {
 			$relative_path  = str_replace( WPMU_PLUGIN_DIR . '/', '', $file );
 			$mu_plugin_file = explode( '/', $relative_path )[0];
-			return sprintf(
-				/* translators: %s: mu-plugin file name */
-				__( 'MU-Plugin: %s', 'oli-cron-jobs' ),
-				$mu_plugin_file
+			return array(
+				'type'  => 'mu-plugin',
+				'label' => sprintf(
+					/* translators: %s: mu-plugin file name */
+					__( 'MU-Plugin: %s', 'oli-cron-jobs' ),
+					$mu_plugin_file
+				),
 			);
 		}
 
-		return __( 'Unknown', 'oli-cron-jobs' );
+		return array(
+			'type'  => 'unknown',
+			'label' => __( 'Unknown', 'oli-cron-jobs' ),
+		);
 	}
 
 	/**
@@ -439,6 +546,8 @@ class Oli_CJ_Cron_Manager {
 
 	/**
 	 * Block paused hooks from running
+	 *
+	 * @param string $hook Hook name.
 	 */
 	public static function maybe_block_paused_hook( $hook ) {
 		if ( self::is_hook_paused( $hook ) ) {

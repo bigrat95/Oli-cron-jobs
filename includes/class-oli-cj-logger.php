@@ -47,7 +47,6 @@ class Oli_CJ_Logger {
 		add_action( 'all', array( $this, 'maybe_log_cron_event' ), 10, 3 );
 		add_action( 'oli_cj_cleanup_logs', array( $this, 'cleanup_old_logs' ) );
 
-		// Schedule log cleanup if not scheduled.
 		if ( ! wp_next_scheduled( 'oli_cj_cleanup_logs' ) ) {
 			wp_schedule_event( time(), 'daily', 'oli_cj_cleanup_logs' );
 		}
@@ -59,23 +58,29 @@ class Oli_CJ_Logger {
 	 * @param string $hook Hook name.
 	 */
 	public function maybe_log_cron_event( $hook ) {
-		// Only log if this is a scheduled cron event.
 		if ( ! defined( 'DOING_CRON' ) || ! DOING_CRON ) {
 			return;
 		}
 
-		// Skip our own cleanup event logging.
 		if ( 'oli_cj_cleanup_logs' === $hook ) {
 			return;
 		}
 
-		// Get args if available.
-		$args = func_num_args() > 1 ? array_slice( func_get_args(), 1 ) : array();
-
+		$args       = func_num_args() > 1 ? array_slice( func_get_args(), 1 ) : array();
 		$start_time = microtime( true );
 
-		// Store start time to calculate duration after event completes.
 		$GLOBALS['oli_cj_event_start'][ $hook ] = $start_time;
+		unset( $args );
+	}
+
+	/**
+	 * Table name
+	 *
+	 * @return string
+	 */
+	private static function table_name() {
+		global $wpdb;
+		return $wpdb->prefix . 'oli_cj_logs';
 	}
 
 	/**
@@ -84,7 +89,7 @@ class Oli_CJ_Logger {
 	public static function create_table() {
 		global $wpdb;
 
-		$table_name      = $wpdb->prefix . 'oli_cj_logs';
+		$table_name      = self::table_name();
 		$charset_collate = $wpdb->get_charset_collate();
 
 		$sql = "CREATE TABLE IF NOT EXISTS $table_name (
@@ -117,8 +122,6 @@ class Oli_CJ_Logger {
 	public static function log_event( $hook, $args = array(), $event_type = 'standard', $duration = 0, $error_message = '' ) {
 		global $wpdb;
 
-		$table_name = $wpdb->prefix . 'oli_cj_logs';
-
 		$data = array(
 			'hook'          => sanitize_text_field( $hook ),
 			'args'          => wp_json_encode( $args ),
@@ -128,7 +131,8 @@ class Oli_CJ_Logger {
 			'created_at'    => current_time( 'mysql' ),
 		);
 
-		$result = $wpdb->insert( $table_name, $data );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Custom plugin table.
+		$result = $wpdb->insert( self::table_name(), $data );
 
 		return $result ? $wpdb->insert_id : false;
 	}
@@ -142,8 +146,6 @@ class Oli_CJ_Logger {
 	public static function get_logs( $args = array() ) {
 		global $wpdb;
 
-		$table_name = $wpdb->prefix . 'oli_cj_logs';
-
 		$defaults = array(
 			'hook'       => '',
 			'event_type' => '',
@@ -152,38 +154,37 @@ class Oli_CJ_Logger {
 			'order'      => 'DESC',
 		);
 
-		$args = wp_parse_args( $args, $defaults );
-
-		$where        = array( '1=1' );
+		$args         = wp_parse_args( $args, $defaults );
+		$table_name   = self::table_name();
+		$limit        = absint( $args['limit'] );
+		$offset       = absint( $args['offset'] );
+		$order        = 'ASC' === strtoupper( $args['order'] ) ? 'ASC' : 'DESC';
+		$where_sql    = '1=1';
 		$where_values = array();
 
 		if ( ! empty( $args['hook'] ) ) {
-			$where[]        = 'hook = %s';
+			$where_sql     .= ' AND hook = %s';
 			$where_values[] = $args['hook'];
 		}
 
 		if ( ! empty( $args['event_type'] ) ) {
-			$where[]        = 'event_type = %s';
+			$where_sql     .= ' AND event_type = %s';
 			$where_values[] = $args['event_type'];
 		}
 
-		$where_sql = implode( ' AND ', $where );
+		$where_values[] = $limit;
+		$where_values[] = $offset;
 
-		$order = 'DESC' === strtoupper( $args['order'] ) ? 'DESC' : 'ASC';
-
-		$sql            = "SELECT * FROM $table_name WHERE $where_sql ORDER BY created_at $order LIMIT %d OFFSET %d";
-		$where_values[] = absint( $args['limit'] );
-		$where_values[] = absint( $args['offset'] );
-
-		if ( ! empty( $where_values ) ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared.
-			$results = $wpdb->get_results( $wpdb->prepare( $sql, $where_values ) );
+		if ( 'ASC' === $order ) {
+			$sql = "SELECT * FROM %i WHERE $where_sql ORDER BY created_at ASC LIMIT %d OFFSET %d";
 		} else {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared.
-			$results = $wpdb->get_results( $sql );
+			$sql = "SELECT * FROM %i WHERE $where_sql ORDER BY created_at DESC LIMIT %d OFFSET %d";
 		}
 
-		return $results;
+		array_unshift( $where_values, $table_name );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Custom table; SQL built from whitelisted fragments.
+		return $wpdb->get_results( $wpdb->prepare( $sql, $where_values ) );
 	}
 
 	/**
@@ -195,34 +196,24 @@ class Oli_CJ_Logger {
 	public static function get_log_count( $args = array() ) {
 		global $wpdb;
 
-		$table_name = $wpdb->prefix . 'oli_cj_logs';
-
-		$where        = array( '1=1' );
-		$where_values = array();
+		$table_name   = self::table_name();
+		$where_sql    = '1=1';
+		$where_values = array( $table_name );
 
 		if ( ! empty( $args['hook'] ) ) {
-			$where[]        = 'hook = %s';
+			$where_sql     .= ' AND hook = %s';
 			$where_values[] = $args['hook'];
 		}
 
 		if ( ! empty( $args['event_type'] ) ) {
-			$where[]        = 'event_type = %s';
+			$where_sql     .= ' AND event_type = %s';
 			$where_values[] = $args['event_type'];
 		}
 
-		$where_sql = implode( ' AND ', $where );
+		$sql = "SELECT COUNT(*) FROM %i WHERE $where_sql";
 
-		$sql = "SELECT COUNT(*) FROM $table_name WHERE $where_sql";
-
-		if ( ! empty( $where_values ) ) {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared.
-			$count = $wpdb->get_var( $wpdb->prepare( $sql, $where_values ) );
-		} else {
-			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared.
-			$count = $wpdb->get_var( $sql );
-		}
-
-		return absint( $count );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Custom table; SQL built from whitelisted fragments.
+		return absint( $wpdb->get_var( $wpdb->prepare( $sql, $where_values ) ) );
 	}
 
 	/**
@@ -231,13 +222,14 @@ class Oli_CJ_Logger {
 	public function cleanup_old_logs() {
 		global $wpdb;
 
-		$retention_days = get_option( 'oli_cj_log_retention_days', 30 );
-		$table_name     = $wpdb->prefix . 'oli_cj_logs';
+		$retention_days = absint( get_option( 'oli_cj_log_retention_days', 30 ) );
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table.
 		$wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM $table_name WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
-				absint( $retention_days )
+				'DELETE FROM %i WHERE created_at < DATE_SUB(NOW(), INTERVAL %d DAY)',
+				self::table_name(),
+				$retention_days
 			)
 		);
 	}
@@ -250,8 +242,8 @@ class Oli_CJ_Logger {
 	public static function clear_all_logs() {
 		global $wpdb;
 
-		$table_name = $wpdb->prefix . 'oli_cj_logs';
-		$result     = $wpdb->query( "TRUNCATE TABLE $table_name" );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table.
+		$result = $wpdb->query( $wpdb->prepare( 'TRUNCATE TABLE %i', self::table_name() ) );
 
 		return false !== $result;
 	}
@@ -265,10 +257,9 @@ class Oli_CJ_Logger {
 	public static function delete_hook_logs( $hook ) {
 		global $wpdb;
 
-		$table_name = $wpdb->prefix . 'oli_cj_logs';
-
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table.
 		return $wpdb->delete(
-			$table_name,
+			self::table_name(),
 			array( 'hook' => $hook ),
 			array( '%s' )
 		);

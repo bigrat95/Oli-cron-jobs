@@ -111,7 +111,7 @@ By default, logs are kept for 30 days. You can configure this in the settings pa
 = 0.1.1 =
 * Added: Edit event UI with support for all event types
 * Added: Export/Import functionality for events and schedules (JSON format)
-* Added: Advanced filtering by status, schedule type, and hook type
+* Added: Advanced filtering by status, schedule, and hook type (core, plugin, custom, URL, PHP)
 * Added: Plugin/theme source detection for callbacks using reflection
 * Enhanced: Callbacks column now shows which plugin/theme registered each callback
 * Improved: Code quality with PHPCS WordPress Coding Standards compliance
