@@ -125,6 +125,9 @@ class Oli_CJ_Plugin {
 
 		self::migrate_legacy_options();
 
+		require_once OLI_CJ_PLUGIN_DIR . 'includes/class-oli-cj-cron-manager.php';
+		Oli_CJ_Cron_Manager::disable_legacy_php_events();
+
 		update_option( 'oli_cj_version', OLI_CJ_VERSION );
 	}
 

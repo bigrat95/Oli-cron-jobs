@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-10-21
+
+### Removed
+- PHP event creation, editing, import, and execution
+- All `eval()` / `create_function()` usage
+
+### Changed
+- Only standard hook events and URL events can be created
+- Stored PHP events from earlier versions stay listed and keep their option data
+- Those PHP events are paused/disabled, never executed, and shown as read-only
+- Admin notice explains that PHP events are no longer supported
+- Plugin version and stable tag bumped to 0.1.3
+
 ## [0.1.2] - 2026-10-21
 
 ### Changed
@@ -143,6 +156,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Object-oriented architecture
 - Proper WordPress hooks and filters integration
 
+[0.1.3]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.3
 [0.1.2]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.2
 [0.1.1]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.1
 [0.1.0]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.0

@@ -8,17 +8,15 @@
 	'use strict';
 
 	/**
-	 * Show URL or PHP fields based on the selected event type.
+	 * Show the URL field when a URL event is selected.
 	 */
 	function oliCjToggleEventTypeFields() {
 		var type = $('#event_type').val();
 
-		$('#url_field, #php_field').addClass('oli-cj-hidden');
+		$('#url_field').addClass('oli-cj-hidden');
 
 		if ('url' === type) {
 			$('#url_field').removeClass('oli-cj-hidden');
-		} else if ('php' === type) {
-			$('#php_field').removeClass('oli-cj-hidden');
 		}
 	}
 

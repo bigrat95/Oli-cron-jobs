@@ -211,6 +211,11 @@ class Oli_CJ_Admin {
 		$args_json = isset( $_GET['args'] ) ? sanitize_text_field( wp_unslash( $_GET['args'] ) ) : '[]';
 		$args      = json_decode( $args_json, true );
 
+		if ( Oli_CJ_Cron_Manager::is_php_event( $hook ) ) {
+			wp_safe_redirect( add_query_arg( 'message', 'php_event_blocked', admin_url( 'tools.php?page=oli-cron-jobs' ) ) );
+			exit;
+		}
+
 		Oli_CJ_Cron_Manager::run_event_now( $hook, $args );
 
 		wp_safe_redirect( add_query_arg( 'message', 'event_ran', admin_url( 'tools.php?page=oli-cron-jobs' ) ) );
@@ -406,11 +411,12 @@ class Oli_CJ_Admin {
 					continue;
 				}
 
+				if ( 'php' === $type ) {
+					continue;
+				}
+
 				if ( 'url' === $type && ! empty( $event['url'] ) ) {
 					Oli_CJ_Cron_Manager::add_url_event( $hook, $timestamp, esc_url_raw( $event['url'] ), $args, $schedule );
-					++$imported_count;
-				} elseif ( 'php' === $type && ! empty( $event['php_code'] ) && Oli_CJ_Cron_Manager::can_execute_php_events() ) {
-					Oli_CJ_Cron_Manager::add_php_event( $hook, $timestamp, $event['php_code'], $args, $schedule );
 					++$imported_count;
 				} else {
 					Oli_CJ_Cron_Manager::add_event( $hook, $timestamp, $args, $schedule );
@@ -491,15 +497,6 @@ class Oli_CJ_Admin {
 					$url = esc_url_raw( wp_unslash( $_POST['url'] ) );
 					Oli_CJ_Cron_Manager::add_url_event( $hook, $timestamp, $url, $args, $schedule ? $schedule : false );
 					echo '<div class="notice notice-success"><p>' . esc_html__( 'URL cron event added successfully.', 'oli-cron-jobs' ) . '</p></div>';
-				} elseif ( 'php' === $event_type && ! empty( $_POST['php_code'] ) ) {
-					if ( Oli_CJ_Cron_Manager::can_execute_php_events() ) {
-						// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- PHP events store privileged raw code.
-						$php_code = isset( $_POST['php_code'] ) ? wp_unslash( $_POST['php_code'] ) : '';
-						Oli_CJ_Cron_Manager::add_php_event( $hook, $timestamp, $php_code, $args, $schedule ? $schedule : false );
-						echo '<div class="notice notice-success"><p>' . esc_html__( 'PHP cron event added successfully.', 'oli-cron-jobs' ) . '</p></div>';
-					} else {
-						echo '<div class="notice notice-error"><p>' . esc_html__( 'You do not have permission to create PHP cron events.', 'oli-cron-jobs' ) . '</p></div>';
-					}
 				} else {
 					Oli_CJ_Cron_Manager::add_event( $hook, $timestamp, $args, $schedule ? $schedule : false );
 					echo '<div class="notice notice-success"><p>' . esc_html__( 'Cron event added successfully.', 'oli-cron-jobs' ) . '</p></div>';
@@ -508,7 +505,6 @@ class Oli_CJ_Admin {
 		}
 
 		$schedules = Oli_CJ_Schedule_Manager::get_all_schedules();
-		$can_php   = Oli_CJ_Cron_Manager::can_execute_php_events();
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html__( 'Add Cron Event', 'oli-cron-jobs' ); ?></h1>
@@ -523,9 +519,6 @@ class Oli_CJ_Admin {
 							<select name="event_type" id="event_type">
 								<option value="standard"><?php echo esc_html__( 'Standard Event', 'oli-cron-jobs' ); ?></option>
 								<option value="url"><?php echo esc_html__( 'URL Event', 'oli-cron-jobs' ); ?></option>
-								<?php if ( $can_php ) : ?>
-									<option value="php"><?php echo esc_html__( 'PHP Event', 'oli-cron-jobs' ); ?></option>
-								<?php endif; ?>
 							</select>
 						</td>
 					</tr>
@@ -570,27 +563,6 @@ class Oli_CJ_Admin {
 							<p class="description"><?php echo esc_html__( 'The URL to request when this cron event runs.', 'oli-cron-jobs' ); ?></p>
 						</td>
 					</tr>
-					<?php if ( $can_php ) : ?>
-						<tr id="php_field" class="oli-cj-hidden">
-							<th scope="row"><label for="php_code"><?php echo esc_html__( 'PHP Code', 'oli-cron-jobs' ); ?></label></th>
-							<td>
-								<div class="oli-cj-php-warning">
-									<h3><?php echo esc_html__( '⚠️ Security Warning', 'oli-cron-jobs' ); ?></h3>
-									<p><?php echo esc_html__( 'PHP cron events execute arbitrary code on your server. Only use this feature if you fully understand the security implications. Incorrect code can break your site.', 'oli-cron-jobs' ); ?></p>
-								</div>
-								<textarea name="php_code" id="php_code" class="large-text code" rows="10" placeholder="<?php echo esc_attr( "// Your PHP code here\necho 'Hello World';" ); ?>"></textarea>
-								<p class="description"><?php echo esc_html__( 'PHP code to execute (without opening PHP tags).', 'oli-cron-jobs' ); ?></p>
-							</td>
-						</tr>
-					<?php elseif ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT ) : ?>
-						<tr>
-							<td colspan="2">
-								<div class="notice notice-info inline">
-									<p><?php echo esc_html__( 'PHP cron events are disabled because file editing is disabled (DISALLOW_FILE_EDIT).', 'oli-cron-jobs' ); ?></p>
-								</div>
-							</td>
-						</tr>
-					<?php endif; ?>
 				</table>
 				
 				<p class="submit">
@@ -628,12 +600,16 @@ class Oli_CJ_Admin {
 
 		// Determine event type.
 		$url        = Oli_CJ_Cron_Manager::get_url( $hook );
-		$php_code   = Oli_CJ_Cron_Manager::get_php_code( $hook );
 		$event_type = 'standard';
 		if ( $url ) {
 			$event_type = 'url';
-		} elseif ( $php_code ) {
+		} elseif ( Oli_CJ_Cron_Manager::is_php_event( $hook ) ) {
 			$event_type = 'php';
+		}
+
+		if ( 'php' === $event_type ) {
+			$this->render_legacy_php_event_view( $event );
+			return;
 		}
 
 		// Handle form submission.
@@ -657,20 +633,14 @@ class Oli_CJ_Admin {
 				}
 			}
 
-			if ( $new_hook ) {
+			if ( $new_hook && 'php' !== $new_event_type ) {
 				// Delete old event.
 				Oli_CJ_Cron_Manager::delete_event( $hook, $timestamp, $sig );
 
-				// Add new event based on type.
+				// Add new event based on type. PHP events cannot be created or updated.
 				if ( 'url' === $new_event_type && ! empty( $_POST['url'] ) ) {
 					$new_url = esc_url_raw( wp_unslash( $_POST['url'] ) );
 					Oli_CJ_Cron_Manager::add_url_event( $new_hook, $new_timestamp, $new_url, $new_args, $new_schedule ? $new_schedule : false );
-				} elseif ( 'php' === $new_event_type && ! empty( $_POST['php_code'] ) ) {
-					if ( Oli_CJ_Cron_Manager::can_execute_php_events() ) {
-						// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- PHP events store privileged raw code.
-						$new_php_code = isset( $_POST['php_code'] ) ? wp_unslash( $_POST['php_code'] ) : '';
-						Oli_CJ_Cron_Manager::add_php_event( $new_hook, $new_timestamp, $new_php_code, $new_args, $new_schedule ? $new_schedule : false );
-					}
 				} else {
 					Oli_CJ_Cron_Manager::add_event( $new_hook, $new_timestamp, $new_args, $new_schedule ? $new_schedule : false );
 				}
@@ -681,7 +651,6 @@ class Oli_CJ_Admin {
 		}
 
 		$schedules        = Oli_CJ_Schedule_Manager::get_all_schedules();
-		$can_php          = Oli_CJ_Cron_Manager::can_execute_php_events();
 		$current_schedule = isset( $event['schedule'] ) ? $event['schedule'] : '';
 		?>
 		<div class="wrap">
@@ -697,9 +666,6 @@ class Oli_CJ_Admin {
 							<select name="event_type" id="event_type">
 								<option value="standard" <?php selected( $event_type, 'standard' ); ?>><?php echo esc_html__( 'Standard Event', 'oli-cron-jobs' ); ?></option>
 								<option value="url" <?php selected( $event_type, 'url' ); ?>><?php echo esc_html__( 'URL Event', 'oli-cron-jobs' ); ?></option>
-								<?php if ( $can_php ) : ?>
-									<option value="php" <?php selected( $event_type, 'php' ); ?>><?php echo esc_html__( 'PHP Event', 'oli-cron-jobs' ); ?></option>
-								<?php endif; ?>
 							</select>
 						</td>
 					</tr>
@@ -744,19 +710,6 @@ class Oli_CJ_Admin {
 							<p class="description"><?php echo esc_html__( 'The URL to request when this cron event runs.', 'oli-cron-jobs' ); ?></p>
 						</td>
 					</tr>
-					<?php if ( $can_php ) : ?>
-						<tr id="php_field"<?php echo 'php' === $event_type ? '' : ' class="oli-cj-hidden"'; ?>>
-							<th scope="row"><label for="php_code"><?php echo esc_html__( 'PHP Code', 'oli-cron-jobs' ); ?></label></th>
-							<td>
-								<div class="oli-cj-php-warning">
-									<h3><?php echo esc_html__( '⚠️ Security Warning', 'oli-cron-jobs' ); ?></h3>
-									<p><?php echo esc_html__( 'PHP cron events execute arbitrary code on your server. Only use this feature if you fully understand the security implications. Incorrect code can break your site.', 'oli-cron-jobs' ); ?></p>
-								</div>
-								<textarea name="php_code" id="php_code" class="large-text code" rows="10"><?php echo esc_textarea( $php_code ? $php_code : '' ); ?></textarea>
-								<p class="description"><?php echo esc_html__( 'PHP code to execute (without opening PHP tags).', 'oli-cron-jobs' ); ?></p>
-							</td>
-						</tr>
-					<?php endif; ?>
 				</table>
 				
 				<p class="submit">
@@ -766,6 +719,62 @@ class Oli_CJ_Admin {
 					</a>
 				</p>
 			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Show a stored PHP event as read-only. Code cannot be edited or executed.
+	 *
+	 * @param array $event Event data.
+	 */
+	private function render_legacy_php_event_view( $event ) {
+		$php_code         = Oli_CJ_Cron_Manager::get_php_code( $event['hook'] );
+		$current_schedule = isset( $event['schedule'] ) ? $event['schedule'] : '';
+		$schedule_label   = $current_schedule ? Oli_CJ_Schedule_Manager::get_schedule_display( $current_schedule ) : __( 'Non-repeating', 'oli-cron-jobs' );
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html__( 'PHP Cron Event', 'oli-cron-jobs' ); ?></h1>
+
+			<div class="notice notice-warning">
+				<p><?php echo esc_html__( 'PHP cron events are no longer supported. This event stays listed and its stored data is kept, but it is disabled, never executed, and its code cannot be edited.', 'oli-cron-jobs' ); ?></p>
+			</div>
+
+			<table class="form-table">
+				<tr>
+					<th scope="row"><?php echo esc_html__( 'Event Type', 'oli-cron-jobs' ); ?></th>
+					<td><?php echo esc_html__( 'PHP Event (unsupported)', 'oli-cron-jobs' ); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html__( 'Hook Name', 'oli-cron-jobs' ); ?></th>
+					<td><code><?php echo esc_html( $event['hook'] ); ?></code></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html__( 'Next Run', 'oli-cron-jobs' ); ?></th>
+					<td><?php echo esc_html( gmdate( 'Y-m-d H:i', $event['timestamp'] ) . ' UTC' ); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html__( 'Recurrence', 'oli-cron-jobs' ); ?></th>
+					<td><?php echo esc_html( $schedule_label ); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html__( 'Arguments', 'oli-cron-jobs' ); ?></th>
+					<td><code><?php echo esc_html( wp_json_encode( $event['args'] ) ); ?></code></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html__( 'Stored PHP Code', 'oli-cron-jobs' ); ?></th>
+					<td>
+						<textarea class="large-text code" rows="10" readonly="readonly"><?php echo esc_textarea( $php_code ? $php_code : '' ); ?></textarea>
+						<p class="description"><?php echo esc_html__( 'This code is stored only. It is never executed and cannot be changed here.', 'oli-cron-jobs' ); ?></p>
+					</td>
+				</tr>
+			</table>
+
+			<p>
+				<a href="<?php echo esc_url( admin_url( 'tools.php?page=oli-cron-jobs' ) ); ?>" class="button">
+					<?php echo esc_html__( 'Back to Events', 'oli-cron-jobs' ); ?>
+				</a>
+			</p>
 		</div>
 		<?php
 	}
@@ -1036,19 +1045,21 @@ class Oli_CJ_Admin {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only redirect message.
 		$message  = sanitize_text_field( wp_unslash( $_GET['message'] ) );
 		$messages = array(
-			'event_deleted'    => __( 'Event deleted successfully.', 'oli-cron-jobs' ),
-			'event_updated'    => __( 'Event updated successfully.', 'oli-cron-jobs' ),
-			'event_ran'        => __( 'Event executed successfully.', 'oli-cron-jobs' ),
-			'hook_paused'      => __( 'Hook paused successfully.', 'oli-cron-jobs' ),
-			'hook_resumed'     => __( 'Hook resumed successfully.', 'oli-cron-jobs' ),
-			'schedule_deleted' => __( 'Schedule deleted successfully.', 'oli-cron-jobs' ),
-			'logs_cleared'     => __( 'Logs cleared successfully.', 'oli-cron-jobs' ),
-			'exported'         => __( 'Data exported successfully.', 'oli-cron-jobs' ),
-			'imported'         => __( 'Data imported successfully.', 'oli-cron-jobs' ),
+			'event_deleted'     => __( 'Event deleted successfully.', 'oli-cron-jobs' ),
+			'event_updated'     => __( 'Event updated successfully.', 'oli-cron-jobs' ),
+			'event_ran'         => __( 'Event executed successfully.', 'oli-cron-jobs' ),
+			'php_event_blocked' => __( 'PHP cron events are no longer supported and cannot be executed.', 'oli-cron-jobs' ),
+			'hook_paused'       => __( 'Hook paused successfully.', 'oli-cron-jobs' ),
+			'hook_resumed'      => __( 'Hook resumed successfully.', 'oli-cron-jobs' ),
+			'schedule_deleted'  => __( 'Schedule deleted successfully.', 'oli-cron-jobs' ),
+			'logs_cleared'      => __( 'Logs cleared successfully.', 'oli-cron-jobs' ),
+			'exported'          => __( 'Data exported successfully.', 'oli-cron-jobs' ),
+			'imported'          => __( 'Data imported successfully.', 'oli-cron-jobs' ),
 		);
 
 		if ( isset( $messages[ $message ] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $messages[ $message ] ) . '</p></div>';
+			$notice_class = ( 'php_event_blocked' === $message ) ? 'notice-warning' : 'notice-success';
+			echo '<div class="notice ' . esc_attr( $notice_class ) . ' is-dismissible"><p>' . esc_html( $messages[ $message ] ) . '</p></div>';
 		}
 	}
 }

@@ -5,7 +5,7 @@ Tags: cron, wp-cron, scheduled tasks, cron manager, debugging
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.2
+Stable tag: 0.1.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,7 +23,6 @@ Oli Cron Jobs is a powerful and user-friendly plugin for managing WordPress cron
 * **Pause/Resume Hooks** - Temporarily disable specific hooks without deleting them
 * **Custom Schedules** - Create and manage custom cron intervals
 * **URL Cron Events** - Schedule HTTP requests to external URLs
-* **PHP Cron Events** - Execute custom PHP code (restricted to users with appropriate capabilities)
 * **Comprehensive Logging** - Track event executions with duration and error logging
 * **Site Health Integration** - Automatic checks for WP-Cron issues including disabled cron, spawn failures, and missed events
 * **Admin Bar Notices** - Quick access to cron management with issue notifications
@@ -55,8 +54,9 @@ Manage cron events from the command line:
 Security is a top priority:
 
 * All operations require `manage_options` capability
-* PHP cron events restricted to users with `edit_files` AND `unfiltered_html` capabilities
-* PHP events disabled when `DISALLOW_FILE_EDIT` is defined
+* The plugin does not execute arbitrary PHP. There is no `eval()` and no `create_function()`
+* Only standard hook events and opt-in URL events can be created
+* Existing PHP events from earlier versions stay stored and listed, but they are disabled and never executed
 * Proper nonce verification on all actions
 * All input sanitized and output escaped
 
@@ -86,9 +86,9 @@ Yes, but be careful! Deleting core WordPress events may affect functionality lik
 
 When a hook is paused, it will not execute even if the scheduled time arrives. The event remains in the schedule but is blocked from running.
 
-= Is it safe to use PHP cron events? =
+= What happened to PHP cron events? =
 
-PHP cron events should only be used if you understand the security implications. They are restricted to users with full PHP execution capabilities and are disabled when file editing is disabled.
+PHP cron events were removed in version 0.1.3. The plugin no longer executes stored PHP and no longer offers a PHP event type when you add or edit an event. Existing PHP events stay listed and their stored data is kept, but they are disabled, never executed, and their code cannot be edited. Use a standard hook or a URL event instead.
 
 = Does this work with DISABLE_WP_CRON? =
 
@@ -130,6 +130,13 @@ The plugin does not call olivierbigras.com, paypal.com, Google APIs, Cloudflare 
 
 == Changelog ==
 
+= 0.1.3 =
+* Removed PHP event creation and execution. The plugin no longer uses eval() or create_function()
+* Existing PHP events stay listed and stored, but they are disabled, never executed, and not editable
+* Added an admin notice explaining that PHP events are no longer supported
+* Creation UI now offers only standard hook events and URL events
+* Import skips PHP events so they cannot be recreated
+
 = 0.1.2 =
 * Moved the add/edit event-type toggle scripts into the enqueued admin.js file
 * Replaced remaining inline onclick handlers and color styles with classes and CSS
@@ -164,6 +171,9 @@ The plugin does not call olivierbigras.com, paypal.com, Google APIs, Cloudflare 
 * Full internationalization support
 
 == Upgrade Notice ==
+
+= 0.1.3 =
+PHP events are no longer supported or executed. Existing PHP events stay listed and stored, but they are disabled. Use a hook or URL event instead.
 
 = 0.1.2 =
 WordPress.org readiness: no inline scripts or styles, External services section, and lossless option upgrade.

@@ -18,26 +18,24 @@ class Oli_CJ_Cron_Manager {
 	 * Initialize hooks
 	 */
 	public static function init() {
-		// Hook into all actions to execute URL and PHP events.
+		// Hook into all actions to execute URL events. Legacy PHP events are never executed.
 		add_action( 'init', array( __CLASS__, 'register_event_handlers' ), 1 );
 	}
 
 	/**
-	 * Register handlers for URL and PHP events
+	 * Register handlers for URL events.
+	 *
+	 * Stored PHP events from earlier versions stay in the options table
+	 * and in the events list, but they are never executed.
 	 */
 	public static function register_event_handlers() {
-		// Get all URL events.
 		$url_events = get_option( 'oli_cj_url_events', array() );
-		foreach ( $url_events as $hook => $url ) {
-			add_action( $hook, array( __CLASS__, 'execute_url_event_wrapper' ) );
+		if ( ! is_array( $url_events ) ) {
+			return;
 		}
 
-		// PHP events still run via cron unless file editing is disabled.
-		if ( ! defined( 'DISALLOW_FILE_EDIT' ) || ! DISALLOW_FILE_EDIT ) {
-			$php_events = get_option( 'oli_cj_php_events', array() );
-			foreach ( $php_events as $hook => $code ) {
-				add_action( $hook, array( __CLASS__, 'execute_php_event_wrapper' ) );
-			}
+		foreach ( array_keys( $url_events ) as $hook ) {
+			add_action( $hook, array( __CLASS__, 'execute_url_event_wrapper' ) );
 		}
 	}
 
@@ -50,26 +48,54 @@ class Oli_CJ_Cron_Manager {
 	}
 
 	/**
-	 * Wrapper for executing PHP events
+	 * PHP events are no longer created or executed.
+	 *
+	 * @return bool Always false.
 	 */
-	public static function execute_php_event_wrapper() {
-		$hook = current_filter();
-		self::execute_php_event( $hook );
+	public static function can_execute_php_events() {
+		return false;
 	}
 
 	/**
-	 * Check if current user can execute PHP events
+	 * Get all stored PHP events from earlier plugin versions.
+	 *
+	 * Data is kept for display and export. The stored code is never executed.
+	 *
+	 * @return array
+	 */
+	public static function get_php_events() {
+		$php_events = get_option( 'oli_cj_php_events', array() );
+		return is_array( $php_events ) ? $php_events : array();
+	}
+
+	/**
+	 * Whether any legacy PHP events are still stored.
 	 *
 	 * @return bool
 	 */
-	public static function can_execute_php_events() {
-		// Disabled if file editing is disabled.
-		if ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT ) {
-			return false;
-		}
+	public static function has_legacy_php_events() {
+		return ! empty( self::get_php_events() );
+	}
 
-		// Require both edit_files and unfiltered_html capabilities.
-		return current_user_can( 'edit_files' ) && current_user_can( 'unfiltered_html' );
+	/**
+	 * Whether a hook is a stored PHP event from an earlier version.
+	 *
+	 * @param string $hook Hook name.
+	 * @return bool
+	 */
+	public static function is_php_event( $hook ) {
+		return false !== self::get_php_code( $hook );
+	}
+
+	/**
+	 * Pause stored PHP events so they appear disabled. Does not delete data.
+	 */
+	public static function disable_legacy_php_events() {
+		foreach ( array_keys( self::get_php_events() ) as $hook ) {
+			if ( is_string( $hook ) && '' !== $hook ) {
+				self::pause_hook( $hook );
+			}
+		}
 	}
 
 	/**
@@ -292,6 +318,11 @@ class Oli_CJ_Cron_Manager {
 	 * @return mixed Result of the action.
 	 */
 	public static function run_event_now( $hook, $args = array() ) {
+		if ( self::is_php_event( $hook ) ) {
+			Oli_CJ_Logger::log_event( $hook, $args, 'blocked', 0, 'PHP events are no longer supported' );
+			return false;
+		}
+
 		$start_time = microtime( true );
 
 		// Run the event.
@@ -560,57 +591,16 @@ class Oli_CJ_Cron_Manager {
 	}
 
 	/**
-	 * Add a PHP cron event
+	 * Get stored PHP code for a legacy hook.
 	 *
-	 * @param string $hook Hook name.
-	 * @param int    $timestamp Timestamp.
-	 * @param string $php_code PHP code to execute.
-	 * @param array  $args Arguments.
-	 * @param string $schedule Schedule name.
-	 * @return bool
-	 */
-	public static function add_php_event( $hook, $timestamp, $php_code, $args = array(), $schedule = false ) {
-		// Store PHP code in option.
-		$php_events          = get_option( 'oli_cj_php_events', array() );
-		$php_events[ $hook ] = $php_code;
-		update_option( 'oli_cj_php_events', $php_events );
-
-		// Schedule the event.
-		return self::add_event( $hook, $timestamp, $args, $schedule );
-	}
-
-	/**
-	 * Get PHP code for a hook
+	 * The code is never executed. It is kept so existing events stay listed.
 	 *
 	 * @param string $hook Hook name.
 	 * @return string|false
 	 */
 	public static function get_php_code( $hook ) {
-		$php_events = get_option( 'oli_cj_php_events', array() );
+		$php_events = self::get_php_events();
 		return isset( $php_events[ $hook ] ) ? $php_events[ $hook ] : false;
-	}
-
-	/**
-	 * Execute PHP code for an event
-	 *
-	 * @param string $hook Hook name.
-	 */
-	public static function execute_php_event( $hook ) {
-		$php_code = self::get_php_code( $hook );
-		if ( $php_code ) {
-			$start_time = microtime( true );
-			$error      = '';
-
-			try {
-				// phpcs:ignore Squiz.PHP.Eval.Discouraged -- This is intentional for PHP cron events.
-				eval( $php_code );
-			} catch ( Exception $e ) {
-				$error = $e->getMessage();
-			}
-
-			$duration = microtime( true ) - $start_time;
-			Oli_CJ_Logger::log_event( $hook, array(), 'php', $duration, $error );
-		}
 	}
 
 	/**

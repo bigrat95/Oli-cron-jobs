@@ -18,7 +18,9 @@ tr.oli-cj-event-overdue {
 }
 
 .oli-cj-event-paused,
-tr.oli-cj-event-paused {
+tr.oli-cj-event-paused,
+.oli-cj-event-unsupported,
+tr.oli-cj-event-unsupported {
 	background-color: #fcf9e8;
 }
 
@@ -34,7 +36,8 @@ tr.oli-cj-event-paused {
 
 .oli-cj-status-warning,
 .oli-cj-status-paused,
-.oli-cj-status-disabled {
+.oli-cj-status-disabled,
+.oli-cj-status-unsupported {
 	color: #dba617;
 }
 

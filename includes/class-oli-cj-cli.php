@@ -105,6 +105,11 @@ class Oli_CJ_CLI {
 			}
 		}
 
+		if ( Oli_CJ_Cron_Manager::is_php_event( $hook ) ) {
+			WP_CLI::error( __( 'PHP cron events are no longer supported and cannot be executed.', 'oli-cron-jobs' ) );
+			return;
+		}
+
 		/* translators: %s: cron hook name */
 		WP_CLI::log( sprintf( __( 'Running cron event: %s', 'oli-cron-jobs' ), $hook ) );
 

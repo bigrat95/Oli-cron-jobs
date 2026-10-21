@@ -16,9 +16,9 @@ A comprehensive WP-Cron management plugin for WordPress with advanced features f
 - **Pause/Resume**: Temporarily disable hooks without deleting them
 - **Custom Schedules**: Create and manage custom cron intervals
 - **Advanced Event Types**:
-  - Standard WordPress cron events
+  - Standard WordPress cron events (hooks)
   - URL-based cron events (HTTP requests)
-  - PHP code execution events (with security restrictions)
+  - Legacy PHP events stay listed and stored but are disabled and never executed
 
 ### 📊 Monitoring & Logging
 
@@ -58,11 +58,11 @@ wp oli-cron resume my_custom_hook
 ### 🔒 Security Features
 
 - All operations require `manage_options` capability
-- PHP events restricted to users with `edit_files` AND `unfiltered_html`
-- PHP events disabled when `DISALLOW_FILE_EDIT` is defined
+- No arbitrary PHP execution (`eval()` and `create_function()` are not used)
+- Only standard hook events and URL events can be created
+- Legacy PHP events remain stored and listed, but they are never executed
 - Proper nonce verification on all actions
 - Input sanitization and output escaping
-- Clear security warnings for dangerous operations
 
 ## Installation
 

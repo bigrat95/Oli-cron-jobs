@@ -49,6 +49,8 @@ class Oli_CJ_Notices {
 			return;
 		}
 
+		$this->maybe_show_php_events_notice();
+
 		$issues = Oli_CJ_Site_Health::get_issues();
 
 		foreach ( $issues as $issue ) {
@@ -60,6 +62,26 @@ class Oli_CJ_Notices {
 				esc_html( $issue['message'] )
 			);
 		}
+	}
+
+	/**
+	 * Explain that stored PHP events are no longer supported or executed.
+	 */
+	private function maybe_show_php_events_notice() {
+		if ( ! Oli_CJ_Cron_Manager::has_legacy_php_events() ) {
+			return;
+		}
+
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || false === strpos( $screen->id, 'oli-cron-jobs' ) ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-warning"><p><strong>%s:</strong> %s</p></div>',
+			esc_html__( 'Oli Cron Jobs', 'oli-cron-jobs' ),
+			esc_html__( 'PHP cron events are no longer supported. Existing PHP events stay listed and their stored data is kept, but they are disabled, never executed, and their code cannot be edited. Use a standard hook or a URL event instead.', 'oli-cron-jobs' )
+		);
 	}
 
 	/**
