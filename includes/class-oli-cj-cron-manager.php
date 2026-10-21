@@ -56,25 +56,25 @@ class Oli_CJ_Cron_Manager {
 	 * The guard prevents get_option() from re-entering this class when an
 	 * option read fires `pre_option_*` / `all` callbacks.
 	 *
-	 * @param string $key     Option name.
-	 * @param mixed  $default Default value.
+	 * @param string $key           Option name.
+	 * @param mixed  $default_value Default value.
 	 * @return mixed
 	 */
-	public static function get_plugin_option( $key, $default = array() ) {
+	public static function get_plugin_option( $key, $default_value = array() ) {
 		if ( array_key_exists( $key, self::$option_cache ) ) {
 			return self::$option_cache[ $key ];
 		}
 
 		if ( self::$reading_option ) {
-			return $default;
+			return $default_value;
 		}
 
 		self::$reading_option = true;
-		$value                = get_option( $key, $default );
+		$value                = get_option( $key, $default_value );
 		self::$reading_option = false;
 
-		if ( is_array( $default ) && ! is_array( $value ) ) {
-			$value = $default;
+		if ( is_array( $default_value ) && ! is_array( $value ) ) {
+			$value = $default_value;
 		}
 
 		self::$option_cache[ $key ] = $value;
