@@ -1,0 +1,38 @@
+# Development and packaging files excluded from the WordPress.org ZIP.
+.git
+.github
+.gitignore
+.gitattributes
+.distignore
+.wp-env.json
+.env
+.env.local
+
+# Tests and development scripts
+tests
+bin
+
+# Coding standards and test runners
+phpcs.xml
+phpcs.xml.dist
+phpunit.xml
+phpunit.xml.dist
+.phpunit.result.cache
+
+# Composer and Node (dev-only)
+composer.json
+composer.lock
+package.json
+package-lock.json
+node_modules
+vendor
+
+# Internal markdown (keep readme.txt)
+*.md
+
+# IDE and OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.log

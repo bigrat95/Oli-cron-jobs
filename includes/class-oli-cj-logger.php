@@ -58,6 +58,12 @@ class Oli_CJ_Logger {
 	 * @param string $hook Hook name.
 	 */
 	public function maybe_log_cron_event( $hook ) {
+		static $handling = false;
+
+		if ( $handling ) {
+			return;
+		}
+
 		if ( ! defined( 'DOING_CRON' ) || ! DOING_CRON ) {
 			return;
 		}
@@ -66,11 +72,13 @@ class Oli_CJ_Logger {
 			return;
 		}
 
+		$handling   = true;
 		$args       = func_num_args() > 1 ? array_slice( func_get_args(), 1 ) : array();
 		$start_time = microtime( true );
 
 		$GLOBALS['oli_cj_event_start'][ $hook ] = $start_time;
 		unset( $args );
+		$handling = false;
 	}
 
 	/**

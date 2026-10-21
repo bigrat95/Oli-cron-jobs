@@ -156,6 +156,15 @@ This plugin follows WordPress Coding Standards. All code is:
 
 PHP syntax is checked against PHP 7.4 through 8.3. The GitHub Actions workflow automatically tests on all supported PHP versions.
 
+```bash
+# PHPUnit (requires WP_ROOT pointing at a WordPress install)
+composer install
+WP_ROOT=/path/to/wordpress composer test
+
+# WP-CLI: URL event must request and log
+wp cron event run oli_cj_cli_url_event   # used by bin/run-url-cron-test.sh
+```
+
 ## Known Limitations vs WP Crontrol
 
 This is an independent implementation with feature parity goals. Some differences:

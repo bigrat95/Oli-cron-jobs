@@ -15,11 +15,83 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Oli_CJ_Cron_Manager {
 
 	/**
-	 * Initialize hooks
+	 * In-request cache of plugin options.
+	 *
+	 * @var array
+	 */
+	private static $option_cache = array();
+
+	/**
+	 * Whether a plugin option is currently being read from the database.
+	 *
+	 * @var bool
+	 */
+	private static $reading_option = false;
+
+	/**
+	 * Whether a paused hook is currently being blocked.
+	 *
+	 * @var bool
+	 */
+	private static $blocking_paused_hook = false;
+
+	/**
+	 * Register URL handlers and paused-hook guards immediately.
+	 *
+	 * Must not wait for a later `init` hook: Plugin::init() already runs on
+	 * `init` priority 10, so an `init` priority 1 callback would never fire.
 	 */
 	public static function init() {
-		// Hook into all actions to execute URL events. Legacy PHP events are never executed.
-		add_action( 'init', array( __CLASS__, 'register_event_handlers' ), 1 );
+		self::register_event_handlers();
+		self::register_paused_hook_guards();
+
+		if ( ! has_action( 'wp_loaded', array( __CLASS__, 'strip_paused_hook_callbacks' ) ) ) {
+			add_action( 'wp_loaded', array( __CLASS__, 'strip_paused_hook_callbacks' ), PHP_INT_MAX );
+		}
+	}
+
+	/**
+	 * Get a plugin option with a static cache and a re-entry guard.
+	 *
+	 * The guard prevents get_option() from re-entering this class when an
+	 * option read fires `pre_option_*` / `all` callbacks.
+	 *
+	 * @param string $key     Option name.
+	 * @param mixed  $default Default value.
+	 * @return mixed
+	 */
+	public static function get_plugin_option( $key, $default = array() ) {
+		if ( array_key_exists( $key, self::$option_cache ) ) {
+			return self::$option_cache[ $key ];
+		}
+
+		if ( self::$reading_option ) {
+			return $default;
+		}
+
+		self::$reading_option = true;
+		$value                = get_option( $key, $default );
+		self::$reading_option = false;
+
+		if ( is_array( $default ) && ! is_array( $value ) ) {
+			$value = $default;
+		}
+
+		self::$option_cache[ $key ] = $value;
+
+		return $value;
+	}
+
+	/**
+	 * Update a plugin option and keep the static cache in sync.
+	 *
+	 * @param string $key   Option name.
+	 * @param mixed  $value Option value.
+	 * @return bool
+	 */
+	public static function update_plugin_option( $key, $value ) {
+		self::$option_cache[ $key ] = $value;
+		return update_option( $key, $value );
 	}
 
 	/**
@@ -29,13 +101,86 @@ class Oli_CJ_Cron_Manager {
 	 * and in the events list, but they are never executed.
 	 */
 	public static function register_event_handlers() {
-		$url_events = get_option( 'oli_cj_url_events', array() );
+		$url_events = self::get_plugin_option( 'oli_cj_url_events', array() );
 		if ( ! is_array( $url_events ) ) {
 			return;
 		}
 
 		foreach ( array_keys( $url_events ) as $hook ) {
+			self::register_url_event_handler( $hook );
+		}
+	}
+
+	/**
+	 * Attach the URL execution callback to a hook once.
+	 *
+	 * @param string $hook Hook name.
+	 */
+	public static function register_url_event_handler( $hook ) {
+		if ( ! is_string( $hook ) || '' === $hook ) {
+			return;
+		}
+
+		if ( ! has_action( $hook, array( __CLASS__, 'execute_url_event_wrapper' ) ) ) {
 			add_action( $hook, array( __CLASS__, 'execute_url_event_wrapper' ) );
+		}
+	}
+
+	/**
+	 * Attach execution-time blockers for every paused hook.
+	 */
+	public static function register_paused_hook_guards() {
+		foreach ( self::get_paused_hooks() as $hook ) {
+			self::register_paused_hook_guard( $hook );
+		}
+	}
+
+	/**
+	 * Attach a low-priority callback that strips a paused hook's actions.
+	 *
+	 * @param string $hook Hook name.
+	 */
+	public static function register_paused_hook_guard( $hook ) {
+		if ( ! is_string( $hook ) || '' === $hook ) {
+			return;
+		}
+
+		if ( ! has_action( $hook, array( __CLASS__, 'block_paused_execution' ) ) ) {
+			add_action( $hook, array( __CLASS__, 'block_paused_execution' ), PHP_INT_MIN );
+		}
+	}
+
+	/**
+	 * Remove the execution-time blocker from a resumed hook.
+	 *
+	 * @param string $hook Hook name.
+	 */
+	public static function unregister_paused_hook_guard( $hook ) {
+		if ( ! is_string( $hook ) || '' === $hook ) {
+			return;
+		}
+
+		remove_action( $hook, array( __CLASS__, 'block_paused_execution' ), PHP_INT_MIN );
+	}
+
+	/**
+	 * Remove callbacks from paused hooks after other plugins have registered.
+	 *
+	 * `remove_all_actions()` during `do_action` cannot stop later priorities:
+	 * WP_Hook already copied the callback list. Stripping on `wp_loaded` does.
+	 */
+	public static function strip_paused_hook_callbacks() {
+		if ( is_admin() && ! wp_doing_cron() ) {
+			return;
+		}
+
+		foreach ( self::get_paused_hooks() as $hook ) {
+			if ( ! is_string( $hook ) || '' === $hook ) {
+				continue;
+			}
+
+			remove_all_actions( $hook );
+			add_action( $hook, array( __CLASS__, 'block_paused_execution' ), PHP_INT_MIN );
 		}
 	}
 
@@ -64,7 +209,7 @@ class Oli_CJ_Cron_Manager {
 	 * @return array
 	 */
 	public static function get_php_events() {
-		$php_events = get_option( 'oli_cj_php_events', array() );
+		$php_events = self::get_plugin_option( 'oli_cj_php_events', array() );
 		return is_array( $php_events ) ? $php_events : array();
 	}
 
@@ -181,10 +326,10 @@ class Oli_CJ_Cron_Manager {
 	 * @param string $hook Hook name.
 	 */
 	public static function mark_managed( $hook ) {
-		$managed = get_option( 'oli_cj_managed_hooks', array() );
+		$managed = self::get_plugin_option( 'oli_cj_managed_hooks', array() );
 		if ( ! in_array( $hook, $managed, true ) ) {
 			$managed[] = $hook;
-			update_option( 'oli_cj_managed_hooks', $managed );
+			self::update_plugin_option( 'oli_cj_managed_hooks', $managed );
 		}
 	}
 
@@ -199,7 +344,7 @@ class Oli_CJ_Cron_Manager {
 			return true;
 		}
 
-		$managed = get_option( 'oli_cj_managed_hooks', array() );
+		$managed = self::get_plugin_option( 'oli_cj_managed_hooks', array() );
 		return in_array( $hook, $managed, true );
 	}
 
@@ -320,6 +465,11 @@ class Oli_CJ_Cron_Manager {
 	public static function run_event_now( $hook, $args = array() ) {
 		if ( self::is_php_event( $hook ) ) {
 			Oli_CJ_Logger::log_event( $hook, $args, 'blocked', 0, 'PHP events are no longer supported' );
+			return false;
+		}
+
+		if ( self::is_hook_paused( $hook ) ) {
+			Oli_CJ_Logger::log_event( $hook, $args, 'blocked', 0, 'Hook is paused' );
 			return false;
 		}
 
@@ -534,14 +684,23 @@ class Oli_CJ_Cron_Manager {
 	}
 
 	/**
+	 * Get the list of paused hooks.
+	 *
+	 * @return array
+	 */
+	public static function get_paused_hooks() {
+		$paused_hooks = self::get_plugin_option( 'oli_cj_paused_hooks', array() );
+		return is_array( $paused_hooks ) ? array_values( $paused_hooks ) : array();
+	}
+
+	/**
 	 * Check if a hook is paused
 	 *
 	 * @param string $hook Hook name.
 	 * @return bool
 	 */
 	public static function is_hook_paused( $hook ) {
-		$paused_hooks = get_option( 'oli_cj_paused_hooks', array() );
-		return in_array( $hook, $paused_hooks, true );
+		return in_array( $hook, self::get_paused_hooks(), true );
 	}
 
 	/**
@@ -551,11 +710,15 @@ class Oli_CJ_Cron_Manager {
 	 * @return bool
 	 */
 	public static function pause_hook( $hook ) {
-		$paused_hooks = get_option( 'oli_cj_paused_hooks', array() );
+		$paused_hooks = self::get_paused_hooks();
 		if ( ! in_array( $hook, $paused_hooks, true ) ) {
 			$paused_hooks[] = $hook;
-			return update_option( 'oli_cj_paused_hooks', $paused_hooks );
+			$updated        = self::update_plugin_option( 'oli_cj_paused_hooks', $paused_hooks );
+			self::register_paused_hook_guard( $hook );
+			return $updated;
 		}
+
+		self::register_paused_hook_guard( $hook );
 		return true;
 	}
 
@@ -566,28 +729,38 @@ class Oli_CJ_Cron_Manager {
 	 * @return bool
 	 */
 	public static function resume_hook( $hook ) {
-		$paused_hooks = get_option( 'oli_cj_paused_hooks', array() );
+		$paused_hooks = self::get_paused_hooks();
 		$key          = array_search( $hook, $paused_hooks, true );
 		if ( false !== $key ) {
 			unset( $paused_hooks[ $key ] );
-			return update_option( 'oli_cj_paused_hooks', array_values( $paused_hooks ) );
+			$updated = self::update_plugin_option( 'oli_cj_paused_hooks', array_values( $paused_hooks ) );
+			self::unregister_paused_hook_guard( $hook );
+			return $updated;
 		}
+
+		self::unregister_paused_hook_guard( $hook );
 		return true;
 	}
 
 	/**
-	 * Block paused hooks from running
+	 * Strip remaining callbacks when a paused hook fires.
 	 *
-	 * @param string $hook Hook name.
+	 * Registered on each paused hook at PHP_INT_MIN. Never hooked to `all`.
 	 */
-	public static function maybe_block_paused_hook( $hook ) {
-		if ( self::is_hook_paused( $hook ) ) {
-			// Remove all actions for this hook temporarily.
-			remove_all_actions( $hook );
-
-			// Log that it was blocked.
-			Oli_CJ_Logger::log_event( $hook, array(), 'blocked', 0, 'Hook is paused' );
+	public static function block_paused_execution() {
+		if ( self::$blocking_paused_hook || self::$reading_option ) {
+			return;
 		}
+
+		$hook = current_filter();
+		if ( ! self::is_hook_paused( $hook ) ) {
+			return;
+		}
+
+		self::$blocking_paused_hook = true;
+		remove_all_actions( $hook );
+		Oli_CJ_Logger::log_event( $hook, array(), 'blocked', 0, 'Hook is paused' );
+		self::$blocking_paused_hook = false;
 	}
 
 	/**
@@ -614,12 +787,11 @@ class Oli_CJ_Cron_Manager {
 	 * @return bool
 	 */
 	public static function add_url_event( $hook, $timestamp, $url, $args = array(), $schedule = false ) {
-		// Store URL in option.
-		$url_events          = get_option( 'oli_cj_url_events', array() );
+		$url_events          = self::get_plugin_option( 'oli_cj_url_events', array() );
 		$url_events[ $hook ] = $url;
-		update_option( 'oli_cj_url_events', $url_events );
+		self::update_plugin_option( 'oli_cj_url_events', $url_events );
+		self::register_url_event_handler( $hook );
 
-		// Schedule the event.
 		return self::add_event( $hook, $timestamp, $args, $schedule );
 	}
 
@@ -630,7 +802,7 @@ class Oli_CJ_Cron_Manager {
 	 * @return string|false
 	 */
 	public static function get_url( $hook ) {
-		$url_events = get_option( 'oli_cj_url_events', array() );
+		$url_events = self::get_plugin_option( 'oli_cj_url_events', array() );
 		return isset( $url_events[ $hook ] ) ? $url_events[ $hook ] : false;
 	}
 
@@ -640,6 +812,10 @@ class Oli_CJ_Cron_Manager {
 	 * @param string $hook Hook name.
 	 */
 	public static function execute_url_event( $hook ) {
+		if ( self::is_hook_paused( $hook ) ) {
+			return;
+		}
+
 		$url = self::get_url( $hook );
 		if ( $url ) {
 			$start_time = microtime( true );

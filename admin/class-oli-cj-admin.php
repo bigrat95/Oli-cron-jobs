@@ -40,7 +40,6 @@ class Oli_CJ_Admin {
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
 		add_action( 'admin_init', array( $this, 'handle_actions' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
-		add_action( 'all', array( 'Oli_CJ_Cron_Manager', 'maybe_block_paused_hook' ), 1 );
 	}
 
 	/**
@@ -293,7 +292,7 @@ class Oli_CJ_Admin {
 			'export_date'      => current_time( 'mysql' ),
 			'events'           => array(),
 			'custom_schedules' => Oli_CJ_Schedule_Manager::get_custom_schedules(),
-			'paused_hooks'     => get_option( 'oli_cj_paused_hooks', array() ),
+			'paused_hooks'     => Oli_CJ_Cron_Manager::get_paused_hooks(),
 		);
 
 		// Export custom/managed events only (URL, PHP, and events created here).
@@ -391,7 +390,8 @@ class Oli_CJ_Admin {
 					array_map( 'sanitize_text_field', $import_data['paused_hooks'] )
 				)
 			);
-			update_option( 'oli_cj_paused_hooks', $paused_hooks );
+			Oli_CJ_Cron_Manager::update_plugin_option( 'oli_cj_paused_hooks', $paused_hooks );
+			Oli_CJ_Cron_Manager::register_paused_hook_guards();
 		}
 
 		// Import events.

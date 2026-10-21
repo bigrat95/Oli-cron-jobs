@@ -68,6 +68,9 @@ class Oli_CJ_Plugin {
 	private function init_hooks() {
 		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
 		add_action( 'init', array( $this, 'init' ) );
+
+		// Register URL handlers and pause guards now, not on a later init callback.
+		Oli_CJ_Cron_Manager::init();
 	}
 
 	/**
@@ -81,7 +84,8 @@ class Oli_CJ_Plugin {
 	 * Initialize plugin components
 	 */
 	public function init() {
-		Oli_CJ_Cron_Manager::init();
+		Oli_CJ_Cron_Manager::register_event_handlers();
+		Oli_CJ_Cron_Manager::register_paused_hook_guards();
 		Oli_CJ_Logger::get_instance();
 		Oli_CJ_Site_Health::get_instance();
 		Oli_CJ_Notices::get_instance();

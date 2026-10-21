@@ -5,7 +5,7 @@ Tags: cron, wp-cron, scheduled tasks, cron manager, debugging
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.3
+Stable tag: 0.1.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -130,6 +130,11 @@ The plugin does not call olivierbigras.com, paypal.com, Google APIs, Cloudflare 
 
 == Changelog ==
 
+= 0.1.4 =
+* Fixed an infinite recursion on the `all` hook that returned HTTP 500 on every wp-admin screen
+* Paused hooks are now blocked at execution time with a static option cache and a re-entry guard
+* URL cron events now register their handlers immediately so `wp cron event run` actually requests the URL and writes a log row
+
 = 0.1.3 =
 * Removed PHP event creation and execution. The plugin no longer uses eval() or create_function()
 * Existing PHP events stay listed and stored, but they are disabled, never executed, and not editable
@@ -171,6 +176,9 @@ The plugin does not call olivierbigras.com, paypal.com, Google APIs, Cloudflare 
 * Full internationalization support
 
 == Upgrade Notice ==
+
+= 0.1.4 =
+Fixes the wp-admin HTTP 500 caused by paused-hook handling, and makes URL cron events run.
 
 = 0.1.3 =
 PHP events are no longer supported or executed. Existing PHP events stay listed and stored, but they are disabled. Use a hook or URL event instead.

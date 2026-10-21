@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-10-21
+
+### Fixed
+- Removed the `all` action used to block paused hooks. `get_option()` fired `pre_option_*` then `all` again, which recursed until every wp-admin screen returned HTTP 500
+- Paused hooks are blocked at execution time: each paused hook gets a `PHP_INT_MIN` callback that removes remaining actions
+- Plugin options are cached in a static array, with a re-entry guard around `get_option()`
+- URL event handlers are registered immediately instead of on `init` priority 1 from inside `init` priority 10, so they never missed the hook and never ran
+
+### Added
+- PHPUnit / WP-CLI test that `wp cron event run` on a URL event performs an HTTP request and writes a log row
+- `.distignore` and `.gitattributes` `export-ignore` rules so development files stay out of the WordPress.org ZIP
+
 ## [0.1.3] - 2026-10-21
 
 ### Removed
@@ -156,6 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Object-oriented architecture
 - Proper WordPress hooks and filters integration
 
+[0.1.4]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.4
 [0.1.3]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.3
 [0.1.2]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.2
 [0.1.1]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.1
