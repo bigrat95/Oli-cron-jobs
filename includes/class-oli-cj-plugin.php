@@ -38,6 +38,7 @@ class Oli_CJ_Plugin {
 	 */
 	private function __construct() {
 		$this->load_dependencies();
+		self::maybe_upgrade();
 		$this->init_hooks();
 	}
 
@@ -100,13 +101,62 @@ class Oli_CJ_Plugin {
 	public static function activate() {
 		require_once OLI_CJ_PLUGIN_DIR . 'includes/class-oli-cj-logger.php';
 
-		Oli_CJ_Logger::create_table();
-
 		if ( false === get_option( 'oli_cj_log_retention_days' ) ) {
 			update_option( 'oli_cj_log_retention_days', 30 );
 		}
 
+		self::maybe_upgrade();
+
 		flush_rewrite_rules();
+	}
+
+	/**
+	 * Run versioned upgrades and copy any legacy options to oli_cj_* keys.
+	 */
+	public static function maybe_upgrade() {
+		$stored = get_option( 'oli_cj_version', '' );
+
+		if ( version_compare( (string) $stored, OLI_CJ_VERSION, '>=' ) ) {
+			return;
+		}
+
+		require_once OLI_CJ_PLUGIN_DIR . 'includes/class-oli-cj-logger.php';
+		Oli_CJ_Logger::create_table();
+
+		self::migrate_legacy_options();
+
+		update_option( 'oli_cj_version', OLI_CJ_VERSION );
+	}
+
+	/**
+	 * Copy pre-prefix options onto oli_cj_* keys, then delete the old keys.
+	 *
+	 * Options have used the oli_cj_ prefix since 0.1.0. This keeps upgrades
+	 * lossless if an older unprefixed or alternate key is still present.
+	 */
+	private static function migrate_legacy_options() {
+		$map = array(
+			'oli_cron_jobs_log_retention_days' => 'oli_cj_log_retention_days',
+			'oli_cron_jobs_paused_hooks'       => 'oli_cj_paused_hooks',
+			'oli_cron_jobs_managed_hooks'      => 'oli_cj_managed_hooks',
+			'oli_cron_jobs_url_events'         => 'oli_cj_url_events',
+			'oli_cron_jobs_php_events'         => 'oli_cj_php_events',
+			'oli_cron_jobs_custom_schedules'   => 'oli_cj_custom_schedules',
+		);
+
+		foreach ( $map as $old_key => $new_key ) {
+			$old_value = get_option( $old_key, '__oli_cj_missing__' );
+
+			if ( '__oli_cj_missing__' === $old_value ) {
+				continue;
+			}
+
+			if ( '__oli_cj_missing__' === get_option( $new_key, '__oli_cj_missing__' ) ) {
+				update_option( $new_key, $old_value );
+			}
+
+			delete_option( $old_key );
+		}
 	}
 
 	/**

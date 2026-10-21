@@ -113,18 +113,27 @@ class Oli_CJ_Admin {
 		}
 
 		wp_enqueue_style(
-			'oli-cron-jobs-admin',
+			'oli-cj-admin',
 			OLI_CJ_PLUGIN_URL . 'assets/css/admin.css',
 			array(),
 			OLI_CJ_VERSION
 		);
 
 		wp_enqueue_script(
-			'oli-cron-jobs-admin',
+			'oli-cj-admin',
 			OLI_CJ_PLUGIN_URL . 'assets/js/admin.js',
 			array( 'jquery' ),
 			OLI_CJ_VERSION,
 			true
+		);
+
+		wp_localize_script(
+			'oli-cj-admin',
+			'oli_cj_admin',
+			array(
+				'confirmBulkDelete' => __( 'Are you sure you want to delete the selected events?', 'oli-cron-jobs' ),
+				'confirmGeneric'    => __( 'Are you sure?', 'oli-cron-jobs' ),
+			)
 		);
 	}
 
@@ -323,6 +332,10 @@ class Oli_CJ_Admin {
 	 * Handle import action
 	 */
 	private function handle_import() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to import cron data.', 'oli-cron-jobs' ) );
+		}
+
 		if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'oli_cj_import' ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'oli-cron-jobs' ) );
 		}
@@ -350,28 +363,51 @@ class Oli_CJ_Admin {
 		$imported_count = 0;
 
 		// Import custom schedules.
-		if ( ! empty( $import_data['custom_schedules'] ) ) {
+		if ( ! empty( $import_data['custom_schedules'] ) && is_array( $import_data['custom_schedules'] ) ) {
 			foreach ( $import_data['custom_schedules'] as $name => $schedule ) {
-				Oli_CJ_Schedule_Manager::add_schedule( $name, $schedule['interval'], $schedule['display'] );
+				if ( ! is_array( $schedule ) ) {
+					continue;
+				}
+
+				$name     = sanitize_key( $name );
+				$interval = isset( $schedule['interval'] ) ? absint( $schedule['interval'] ) : 0;
+				$display  = isset( $schedule['display'] ) ? sanitize_text_field( $schedule['display'] ) : '';
+
+				if ( $name && $interval && $display ) {
+					Oli_CJ_Schedule_Manager::add_schedule( $name, $interval, $display );
+				}
 			}
 		}
 
 		// Import paused hooks.
-		if ( ! empty( $import_data['paused_hooks'] ) ) {
-			update_option( 'oli_cj_paused_hooks', $import_data['paused_hooks'] );
+		if ( ! empty( $import_data['paused_hooks'] ) && is_array( $import_data['paused_hooks'] ) ) {
+			$paused_hooks = array_values(
+				array_filter(
+					array_map( 'sanitize_text_field', $import_data['paused_hooks'] )
+				)
+			);
+			update_option( 'oli_cj_paused_hooks', $paused_hooks );
 		}
 
 		// Import events.
-		if ( ! empty( $import_data['events'] ) ) {
+		if ( ! empty( $import_data['events'] ) && is_array( $import_data['events'] ) ) {
 			foreach ( $import_data['events'] as $event ) {
-				$hook      = $event['hook'];
-				$args      = isset( $event['args'] ) ? $event['args'] : array();
-				$timestamp = isset( $event['timestamp'] ) ? $event['timestamp'] : time();
-				$schedule  = isset( $event['schedule'] ) ? $event['schedule'] : false;
-				$type      = isset( $event['type'] ) ? $event['type'] : 'standard';
+				if ( ! is_array( $event ) || empty( $event['hook'] ) ) {
+					continue;
+				}
+
+				$hook      = sanitize_text_field( $event['hook'] );
+				$args      = ( isset( $event['args'] ) && is_array( $event['args'] ) ) ? $event['args'] : array();
+				$timestamp = isset( $event['timestamp'] ) ? absint( $event['timestamp'] ) : time();
+				$schedule  = ! empty( $event['schedule'] ) ? sanitize_key( $event['schedule'] ) : false;
+				$type      = isset( $event['type'] ) ? sanitize_key( $event['type'] ) : 'standard';
+
+				if ( ! $hook ) {
+					continue;
+				}
 
 				if ( 'url' === $type && ! empty( $event['url'] ) ) {
-					Oli_CJ_Cron_Manager::add_url_event( $hook, $timestamp, $event['url'], $args, $schedule );
+					Oli_CJ_Cron_Manager::add_url_event( $hook, $timestamp, esc_url_raw( $event['url'] ), $args, $schedule );
 					++$imported_count;
 				} elseif ( 'php' === $type && ! empty( $event['php_code'] ) && Oli_CJ_Cron_Manager::can_execute_php_events() ) {
 					Oli_CJ_Cron_Manager::add_php_event( $hook, $timestamp, $event['php_code'], $args, $schedule );
@@ -414,7 +450,7 @@ class Oli_CJ_Admin {
 
 			<?php $this->render_messages(); ?>
 
-			<form method="get">
+			<form method="get" id="oli-cj-events-form">
 				<input type="hidden" name="page" value="oli-cron-jobs" />
 				<?php $list_table->search_box( __( 'Search Events', 'oli-cron-jobs' ), 'oli-cj-events' ); ?>
 				<?php $list_table->display(); ?>
@@ -527,7 +563,7 @@ class Oli_CJ_Admin {
 							<p class="description"><?php echo esc_html__( 'JSON array of arguments to pass to the hook. Example: ["arg1", "arg2"]', 'oli-cron-jobs' ); ?></p>
 						</td>
 					</tr>
-					<tr id="url_field" style="display:none;">
+					<tr id="url_field" class="oli-cj-hidden">
 						<th scope="row"><label for="url"><?php echo esc_html__( 'URL', 'oli-cron-jobs' ); ?></label></th>
 						<td>
 							<input type="url" name="url" id="url" class="regular-text" placeholder="https://example.com/api/endpoint" />
@@ -535,7 +571,7 @@ class Oli_CJ_Admin {
 						</td>
 					</tr>
 					<?php if ( $can_php ) : ?>
-						<tr id="php_field" style="display:none;">
+						<tr id="php_field" class="oli-cj-hidden">
 							<th scope="row"><label for="php_code"><?php echo esc_html__( 'PHP Code', 'oli-cron-jobs' ); ?></label></th>
 							<td>
 								<div class="oli-cj-php-warning">
@@ -565,20 +601,6 @@ class Oli_CJ_Admin {
 				</p>
 			</form>
 		</div>
-		
-		<script>
-		jQuery(document).ready(function($) {
-			$('#event_type').on('change', function() {
-				var type = $(this).val();
-				$('#url_field, #php_field').hide();
-				if (type === 'url') {
-					$('#url_field').show();
-				} else if (type === 'php') {
-					$('#php_field').show();
-				}
-			});
-		});
-		</script>
 		<?php
 	}
 
@@ -715,7 +737,7 @@ class Oli_CJ_Admin {
 							<p class="description"><?php echo esc_html__( 'JSON array of arguments to pass to the hook. Example: ["arg1", "arg2"]', 'oli-cron-jobs' ); ?></p>
 						</td>
 					</tr>
-					<tr id="url_field" style="<?php echo 'url' === $event_type ? '' : 'display:none;'; ?>">
+					<tr id="url_field"<?php echo 'url' === $event_type ? '' : ' class="oli-cj-hidden"'; ?>>
 						<th scope="row"><label for="url"><?php echo esc_html__( 'URL', 'oli-cron-jobs' ); ?></label></th>
 						<td>
 							<input type="url" name="url" id="url" class="regular-text" value="<?php echo esc_attr( $url ? $url : '' ); ?>" placeholder="https://example.com/api/endpoint" />
@@ -723,7 +745,7 @@ class Oli_CJ_Admin {
 						</td>
 					</tr>
 					<?php if ( $can_php ) : ?>
-						<tr id="php_field" style="<?php echo 'php' === $event_type ? '' : 'display:none;'; ?>">
+						<tr id="php_field"<?php echo 'php' === $event_type ? '' : ' class="oli-cj-hidden"'; ?>>
 							<th scope="row"><label for="php_code"><?php echo esc_html__( 'PHP Code', 'oli-cron-jobs' ); ?></label></th>
 							<td>
 								<div class="oli-cj-php-warning">
@@ -745,20 +767,6 @@ class Oli_CJ_Admin {
 				</p>
 			</form>
 		</div>
-		
-		<script>
-		jQuery(document).ready(function($) {
-			$('#event_type').on('change', function() {
-				var type = $(this).val();
-				$('#url_field, #php_field').hide();
-				if (type === 'url') {
-					$('#url_field').show();
-				} else if (type === 'php') {
-					$('#php_field').show();
-				}
-			});
-		});
-		</script>
 		<?php
 	}
 
@@ -805,7 +813,7 @@ class Oli_CJ_Admin {
 							<td><?php echo esc_html( Oli_CJ_Schedule_Manager::format_interval( $schedule['interval'] ) ); ?></td>
 							<td>
 								<?php if ( Oli_CJ_Schedule_Manager::is_custom_schedule( $name ) ) : ?>
-									<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'tools.php?page=oli-cron-jobs-schedules&action=delete_schedule&schedule=' . $name ), 'oli_cj_action' ) ); ?>" class="delete" onclick="return confirm('<?php echo esc_js( __( 'Are you sure?', 'oli-cron-jobs' ) ); ?>');">
+									<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'tools.php?page=oli-cron-jobs-schedules&action=delete_schedule&schedule=' . rawurlencode( $name ) ), 'oli_cj_action' ) ); ?>" class="delete oli-cj-confirm" data-oli-cj-confirm="<?php echo esc_attr__( 'Are you sure?', 'oli-cron-jobs' ); ?>">
 										<?php echo esc_html__( 'Delete', 'oli-cron-jobs' ); ?>
 									</a>
 								<?php else : ?>
@@ -862,7 +870,7 @@ class Oli_CJ_Admin {
 		<div class="wrap">
 			<h1>
 				<?php echo esc_html__( 'Cron Logs', 'oli-cron-jobs' ); ?>
-				<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'tools.php?page=oli-cron-jobs-logs&action=clear_logs' ), 'oli_cj_action' ) ); ?>" class="page-title-action" onclick="return confirm('<?php echo esc_js( __( 'Are you sure you want to clear all logs?', 'oli-cron-jobs' ) ); ?>');">
+				<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'tools.php?page=oli-cron-jobs-logs&action=clear_logs' ), 'oli_cj_action' ) ); ?>" class="page-title-action oli-cj-confirm" data-oli-cj-confirm="<?php echo esc_attr__( 'Are you sure you want to clear all logs?', 'oli-cron-jobs' ); ?>">
 					<?php echo esc_html__( 'Clear All Logs', 'oli-cron-jobs' ); ?>
 				</a>
 			</h1>
@@ -906,9 +914,9 @@ class Oli_CJ_Admin {
 								<td><?php echo esc_html( number_format( $log->duration, 4 ) ); ?>s</td>
 								<td>
 									<?php if ( ! empty( $log->error_message ) ) : ?>
-										<span style="color: red;">❌ <?php echo esc_html( $log->error_message ); ?></span>
+										<span class="oli-cj-status-error"><?php echo esc_html( $log->error_message ); ?></span>
 									<?php else : ?>
-										<span style="color: green;">✓ <?php echo esc_html__( 'Success', 'oli-cron-jobs' ); ?></span>
+										<span class="oli-cj-status-success"><?php echo esc_html__( 'Success', 'oli-cron-jobs' ); ?></span>
 									<?php endif; ?>
 								</td>
 							</tr>
@@ -965,10 +973,10 @@ class Oli_CJ_Admin {
 					<th scope="row"><?php echo esc_html__( 'WP-Cron Status', 'oli-cron-jobs' ); ?></th>
 					<td>
 						<?php if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) : ?>
-							<span style="color: orange;">⚠ <?php echo esc_html__( 'Disabled', 'oli-cron-jobs' ); ?></span>
+							<span class="oli-cj-status-disabled"><?php echo esc_html__( 'Disabled', 'oli-cron-jobs' ); ?></span>
 							<p class="description"><?php echo esc_html__( 'WP-Cron is disabled. Make sure you have a server cron job configured.', 'oli-cron-jobs' ); ?></p>
 						<?php else : ?>
-							<span style="color: green;">✓ <?php echo esc_html__( 'Enabled', 'oli-cron-jobs' ); ?></span>
+							<span class="oli-cj-status-success"><?php echo esc_html__( 'Enabled', 'oli-cron-jobs' ); ?></span>
 						<?php endif; ?>
 					</td>
 				</tr>

@@ -291,9 +291,9 @@ class Oli_CJ_List_Table extends WP_List_Table {
 		);
 
 		$actions['delete'] = sprintf(
-			'<a href="%s" class="delete" onclick="return confirm(\'%s\');">%s</a>',
+			'<a href="%s" class="delete oli-cj-confirm" data-oli-cj-confirm="%s">%s</a>',
 			esc_url( admin_url( 'tools.php?page=oli-cron-jobs&action=delete_event&hook=' . rawurlencode( $item['hook'] ) . '&timestamp=' . $item['timestamp'] . '&sig=' . rawurlencode( $item['sig'] ) . '&_wpnonce=' . $nonce ) ),
-			esc_js( __( 'Are you sure?', 'oli-cron-jobs' ) ),
+			esc_attr( __( 'Are you sure?', 'oli-cron-jobs' ) ),
 			__( 'Delete', 'oli-cron-jobs' )
 		);
 
@@ -342,7 +342,7 @@ class Oli_CJ_List_Table extends WP_List_Table {
 
 		if ( $time_diff < 0 ) {
 			return sprintf(
-				'<span style="color: red;">%s</span><br /><small>%s</small>',
+				'<span class="oli-cj-status-overdue">%s</span><br /><small>%s</small>',
 				esc_html( get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $timestamp ), get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ) ),
 				/* translators: %s: human-readable time difference */
 				esc_html( sprintf( __( '%s ago', 'oli-cron-jobs' ), human_time_diff( $timestamp, $current_time ) ) )
@@ -415,14 +415,33 @@ class Oli_CJ_List_Table extends WP_List_Table {
 		$timestamp    = $item['timestamp'];
 
 		if ( Oli_CJ_Cron_Manager::is_hook_paused( $item['hook'] ) ) {
-			return '<span style="color: orange;">⏸ ' . esc_html__( 'Paused', 'oli-cron-jobs' ) . '</span>';
+			return '<span class="oli-cj-status-paused">' . esc_html__( 'Paused', 'oli-cron-jobs' ) . '</span>';
 		}
 
 		if ( $timestamp < ( $current_time - 600 ) ) {
-			return '<span style="color: red;">⚠ ' . esc_html__( 'Overdue', 'oli-cron-jobs' ) . '</span>';
+			return '<span class="oli-cj-status-overdue">' . esc_html__( 'Overdue', 'oli-cron-jobs' ) . '</span>';
 		}
 
-		return '<span style="color: green;">✓ ' . esc_html__( 'Scheduled', 'oli-cron-jobs' ) . '</span>';
+		return '<span class="oli-cj-status-scheduled">' . esc_html__( 'Scheduled', 'oli-cron-jobs' ) . '</span>';
+	}
+
+	/**
+	 * Render a single table row with status classes.
+	 *
+	 * @param array $item Item data.
+	 */
+	public function single_row( $item ) {
+		$class = '';
+
+		if ( Oli_CJ_Cron_Manager::is_hook_paused( $item['hook'] ) ) {
+			$class = 'oli-cj-event-paused';
+		} elseif ( $item['timestamp'] < ( time() - 600 ) ) {
+			$class = 'oli-cj-event-overdue';
+		}
+
+		echo '<tr' . ( $class ? ' class="' . esc_attr( $class ) . '"' : '' ) . '>';
+		$this->single_row_columns( $item );
+		echo '</tr>';
 	}
 
 	/**

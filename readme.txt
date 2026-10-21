@@ -5,7 +5,7 @@ Tags: cron, wp-cron, scheduled tasks, cron manager, debugging
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.1
+Stable tag: 0.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -98,6 +98,28 @@ Yes! The plugin works whether WP-Cron is enabled or disabled. It will display a 
 
 By default, logs are kept for 30 days. You can configure this in the settings page under Tools → Cron Settings.
 
+== External services ==
+
+This plugin does not phone home and does not load third-party fonts, maps, or analytics.
+
+= Site Health cron spawn check =
+
+When a site administrator opens WordPress Site Health, the plugin may send an HTTP POST request to this site's own `wp-cron.php` URL to verify that WP-Cron can spawn. The request stays on the same site. It does not send personal data to a third party.
+
+This check runs only for administrators viewing Site Health.
+
+WordPress privacy policy: https://wordpress.org/about/privacy/
+
+= URL cron events (opt-in) =
+
+If an administrator creates a URL event, the plugin sends an HTTP GET request to the URL they entered when that event runs. The destination, timing, and query string are chosen by the administrator. The plugin does not add WordPress user data unless the administrator includes it in the URL.
+
+This feature is unused until a URL event is created.
+
+Terms and privacy depend on the destination the administrator configures. Review that service's terms and privacy policy before saving a URL event.
+
+The plugin does not call olivierbigras.com, paypal.com, Google APIs, Cloudflare Turnstile, Carto, Leaflet, Google Sheets, or Google Fonts/Typekit from plugin code.
+
 == Screenshots ==
 
 1. Cron Events list showing all scheduled tasks
@@ -107,6 +129,13 @@ By default, logs are kept for 30 days. You can configure this in the settings pa
 5. Admin bar quick access
 
 == Changelog ==
+
+= 0.1.2 =
+* Moved the add/edit event-type toggle scripts into the enqueued admin.js file
+* Replaced remaining inline onclick handlers and color styles with classes and CSS
+* Documented Site Health and URL-event HTTP requests under External services
+* Added a versioned upgrade routine and uninstall cleanup
+* Hardened JSON import sanitization
 
 = 0.1.1 =
 * Added: Edit event UI with support for all event types
@@ -135,6 +164,9 @@ By default, logs are kept for 30 days. You can configure this in the settings pa
 * Full internationalization support
 
 == Upgrade Notice ==
+
+= 0.1.2 =
+WordPress.org readiness: no inline scripts or styles, External services section, and lossless option upgrade.
 
 = 0.1.0 =
 Initial release of Oli Cron Jobs.

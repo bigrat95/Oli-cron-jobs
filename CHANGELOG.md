@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-10-21
+
+### Changed
+- Extracted the two identical add/edit event-type `<script>` blocks into `assets/js/admin.js` and enqueue them with `wp_enqueue_script`
+- Replaced inline `onclick` confirm dialogs and `style=""` color/visibility attributes with CSS classes
+- Localized confirm strings via `wp_localize_script`
+- Documented Site Health spawn checks and opt-in URL events in `readme.txt` under External services
+
+### Added
+- Versioned upgrade routine (`oli_cj_version`) that copies any leftover unprefixed options onto `oli_cj_*` keys, then deletes the old keys
+- `uninstall.php` to remove options, the logs table, and the cleanup cron event
+
+### Fixed
+- Sanitized imported schedules, paused hooks, event hooks, and URLs
+- Import now requires `manage_options` in addition to the existing nonce
+
 ## [0.1.1] - 2026-10-19
 
 ### Added
@@ -127,5 +143,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Object-oriented architecture
 - Proper WordPress hooks and filters integration
 
+[0.1.2]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.2
 [0.1.1]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.1
 [0.1.0]: https://github.com/olivierbigras/Oli-cron-jobs/releases/tag/0.1.0

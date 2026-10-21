@@ -8,12 +8,34 @@
 	color: #d63638;
 }
 
-.oli-cj-event-overdue {
+.oli-cj-hidden {
+	display: none;
+}
+
+.oli-cj-event-overdue,
+tr.oli-cj-event-overdue {
 	background-color: #fcf0f1;
 }
 
-.oli-cj-event-paused {
+.oli-cj-event-paused,
+tr.oli-cj-event-paused {
 	background-color: #fcf9e8;
+}
+
+.oli-cj-status-overdue,
+.oli-cj-status-error {
+	color: #b32d2e;
+}
+
+.oli-cj-status-success,
+.oli-cj-status-scheduled {
+	color: #00a32a;
+}
+
+.oli-cj-status-warning,
+.oli-cj-status-paused,
+.oli-cj-status-disabled {
+	color: #dba617;
 }
 
 .oli-cj-code {

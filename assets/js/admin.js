@@ -4,30 +4,55 @@
  * @package Oli_Cron_Jobs
  */
 
-(function($) {
+(function ($) {
 	'use strict';
 
-	$(document).ready(function() {
-		// Confirm bulk delete action
-		$('.bulkactions').on('click', function(e) {
-			var action = $(this).closest('form').find('select[name="action"]').val();
-			if (action === 'delete') {
-				if (!confirm('Are you sure you want to delete the selected events?')) {
-					e.preventDefault();
-					return false;
-				}
+	/**
+	 * Show URL or PHP fields based on the selected event type.
+	 */
+	function oliCjToggleEventTypeFields() {
+		var type = $('#event_type').val();
+
+		$('#url_field, #php_field').addClass('oli-cj-hidden');
+
+		if ('url' === type) {
+			$('#url_field').removeClass('oli-cj-hidden');
+		} else if ('php' === type) {
+			$('#php_field').removeClass('oli-cj-hidden');
+		}
+	}
+
+	$(function () {
+		if ($('#event_type').length) {
+			oliCjToggleEventTypeFields();
+			$('#event_type').on('change', oliCjToggleEventTypeFields);
+		}
+
+		$(document).on('click', '.oli-cj-confirm', function (event) {
+			var message = $(this).attr('data-oli-cj-confirm');
+
+			if (!message && typeof oli_cj_admin !== 'undefined') {
+				message = oli_cj_admin.confirmGeneric;
 			}
+
+			if (message && !window.confirm(message)) {
+				event.preventDefault();
+				return false;
+			}
+
+			return true;
 		});
 
-		// Highlight overdue events
-		$('.oli-cj-event-overdue').closest('tr').css('background-color', '#fcf0f1');
+		$('#oli-cj-events-form').on('submit', function (event) {
+			var action = $(this).find('select[name="action"]').val();
+			var message = typeof oli_cj_admin !== 'undefined' ? oli_cj_admin.confirmBulkDelete : '';
 
-		// Add warning icon to PHP event forms
-		if ($('#php_code').length > 0) {
-			$('#php_code').before(
-				'<div class="notice notice-warning inline"><p><strong>Warning:</strong> PHP cron events execute arbitrary code on your server. Only use this feature if you understand the security implications.</p></div>'
-			);
-		}
+			if ('delete' === action && message && !window.confirm(message)) {
+				event.preventDefault();
+				return false;
+			}
+
+			return true;
+		});
 	});
-
 })(jQuery);
