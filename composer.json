@@ -1,12 +1,12 @@
 {
-  "name": "bigrat95/oli-cron-jobs",
+  "name": "olivierbigras/oli-cron-jobs",
   "description": "A comprehensive WP-Cron management plugin for WordPress",
   "type": "wordpress-plugin",
   "license": "GPL-2.0-or-later",
   "authors": [
     {
       "name": "Olivier Bigras",
-      "email": "contact@olivierbigras.com",
+      "email": "oli@olivierbigras.com",
       "homepage": "https://olivierbigras.com/"
     }
   ],
