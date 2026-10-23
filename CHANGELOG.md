@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Modifié
 - composer.json : courriel de l’auteur remplacé par oli@olivierbigras.com.
+- composer.json : nom du paquet renommé de bigrat95/ en olivierbigras/.
 
 ## [0.1.4] - 2026-10-21
 
