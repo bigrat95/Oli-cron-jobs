@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<ruleset name="Oli Cron Jobs">
+	<description>Coding standards for Oli Cron Jobs plugin</description>
+
+	<!-- Check all PHP files in directory tree by default. -->
+	<arg name="extensions" value="php"/>
+	<file>.</file>
+
+	<!-- Exclude paths -->
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/tests/*</exclude-pattern>
+
+	<!-- Show progress and sniff codes in all reports -->
+	<arg value="ps"/>
+
+	<!-- Use WordPress coding standards -->
+	<rule ref="WordPress">
+		<!-- Allow short array syntax -->
+		<exclude name="Generic.Arrays.DisallowShortArraySyntax"/>
+		
+		<!-- Allow multiple PHP statements on same line for short checks -->
+		<exclude name="Squiz.PHP.DisallowMultipleAssignments"/>
+	</rule>
+
+	<!-- Enforce WordPress naming conventions -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="oli_cj"/>
+				<element value="Oli_CJ"/>
+				<element value="OLI_CJ"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Check for PHP cross-version compatibility -->
+	<config name="testVersion" value="7.4-"/>
+	<rule ref="PHPCompatibilityWP"/>
+
+	<!-- Text domain check -->
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="oli-cron-jobs"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Minimum PHP version -->
+	<config name="minimum_supported_wp_version" value="6.5"/>
+</ruleset>
